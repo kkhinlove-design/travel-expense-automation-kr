@@ -1,0 +1,4 @@
+* text=auto eol=lf
+
+*.xlsx binary
+public/pdf.worker.min.mjs linguist-generated=true

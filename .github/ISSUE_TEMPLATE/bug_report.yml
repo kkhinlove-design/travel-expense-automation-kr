@@ -1,0 +1,55 @@
+name: 버그 신고
+description: 재현 가능한 오류를 알려 주세요. 실제 출장 문서는 첨부하지 마세요.
+title: "[Bug] "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: 개인정보와 비밀키를 제거한 뒤 작성해 주세요. 보안 문제는 Security Advisory를 이용하세요.
+  - type: textarea
+    id: summary
+    attributes:
+      label: 문제 요약
+      description: 무엇이 잘못되었고 어떤 결과를 기대했나요?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 재현 절차
+      placeholder: |
+        1. ...
+        2. ...
+        3. ...
+    validations:
+      required: true
+  - type: dropdown
+    id: source
+    attributes:
+      label: 사용한 원본
+      options:
+        - PDF만
+        - HWPX만
+        - PDF와 HWPX
+        - 원본 업로드와 무관
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: 환경
+      description: 운영체제, 브라우저 버전, 배포 방식(Vercel/로컬)을 적어 주세요.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: 비식별화한 로그 또는 화면
+      description: 이름, 이메일, 문서번호, 기관명, 키를 제거한 자료만 첨부해 주세요.
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: 개인정보 확인
+      options:
+        - label: 첨부 자료에서 실제 개인정보와 비밀키를 제거했습니다.
+          required: true

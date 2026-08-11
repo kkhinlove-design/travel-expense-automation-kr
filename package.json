@@ -1,0 +1,53 @@
+{
+  "name": "travel-expense-automation-kr",
+  "version": "1.0.0",
+  "private": true,
+  "description": "승인 PDF·HWPX에서 출장 정보를 추출해 국내 출장 여비와 A4 제출 서류를 만드는 Next.js 웹앱",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kkhinlove-design/travel-expense-automation-kr.git"
+  },
+  "bugs": {
+    "url": "https://github.com/kkhinlove-design/travel-expense-automation-kr/issues"
+  },
+  "homepage": "https://github.com/kkhinlove-design/travel-expense-automation-kr#readme",
+  "keywords": [
+    "business-travel",
+    "expense-automation",
+    "hwpx",
+    "korean-public-sector",
+    "nextjs",
+    "supabase",
+    "vercel"
+  ],
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "test": "node --test",
+    "check": "npm test && npm run build"
+  },
+  "dependencies": {
+    "@mlc-ai/web-llm": "0.2.84",
+    "@supabase/ssr": "0.12.4",
+    "@supabase/supabase-js": "2.112.2",
+    "cfb": "1.2.2",
+    "jszip": "3.10.1",
+    "kordoc": "4.7.2",
+    "next": "15.5.23",
+    "pdfjs-dist": "4.10.38",
+    "react": "19.2.6",
+    "react-dom": "19.2.6",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
+  },
+  "overrides": {
+    "adm-zip": "0.6.0",
+    "postcss": "8.5.23",
+    "sharp": "0.35.3"
+  },
+  "type": "module"
+}

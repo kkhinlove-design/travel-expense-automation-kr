@@ -1,0 +1,28 @@
+name: 기능 제안
+description: 개선 아이디어와 사용 사례를 제안해 주세요.
+title: "[Feature] "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: 해결하려는 문제
+      description: 현재 업무에서 어떤 불편이 있나요?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 제안하는 동작
+      description: 입력, 처리 규칙, 출력 결과를 가능한 구체적으로 적어 주세요.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: 규정 또는 양식 근거
+      description: 공개 가능한 링크나 비식별화한 예시만 남겨 주세요.
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: 고려한 대안

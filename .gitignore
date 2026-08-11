@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+
+# Next.js and test output
+.next/
+out/
+coverage/
+*.tsbuildinfo
+
+# Local environment and Vercel linkage
+.env
+.env.*
+!.env.example
+.vercel/
+
+# Supabase CLI local state
+supabase/.branches/
+supabase/.temp/
+
+# Local tooling and logs
+.codex-tmp/
+*.log
+dev-out.log
+dev-err.log
+
+# Editors and operating systems
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
