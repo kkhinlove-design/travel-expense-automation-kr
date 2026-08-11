@@ -38,11 +38,14 @@ body {
     var(--canvas);
   background-size: 28px 28px;
   font-family: "Noto Sans KR", "Malgun Gothic", sans-serif;
+  font-size: 16px;
   -webkit-font-smoothing: antialiased;
 }
 
 button,
-input {
+input,
+select,
+textarea {
   font: inherit;
 }
 

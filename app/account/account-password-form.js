@@ -54,7 +54,7 @@ export default function AccountPasswordForm({ user, signOutPath }) {
     <main style={{ minHeight: "100vh", display: "grid", placeItems: "center", padding: 24, background: "#f4f6fa" }}>
       <div style={{ width: "min(100%, 480px)" }}>
         <form onSubmit={submit} style={{ padding: 32, borderRadius: 18, background: "#fff", boxShadow: "0 14px 50px #1d2b4418" }}>
-          <p style={{ margin: 0, color: "#667085", fontSize: 12, fontWeight: 800, letterSpacing: "0.12em" }}>MY ACCOUNT</p>
+          <p style={{ margin: 0, color: "#667085", fontSize: 13, fontWeight: 800, letterSpacing: "0.12em" }}>MY ACCOUNT</p>
           <h1 style={{ margin: "10px 0 8px", color: "#172033" }}>내 계정</h1>
           <p style={{ margin: 0, color: "#667085", lineHeight: 1.6 }}>로그인한 계정의 비밀번호를 변경할 수 있습니다.</p>
           <div style={{ marginTop: 20, padding: "12px 14px", borderRadius: 9, background: "#f5f8fc", color: "#475467", fontSize: 14 }}>
