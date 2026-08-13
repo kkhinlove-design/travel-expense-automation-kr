@@ -1,9 +1,6 @@
 import { redirect } from "next/navigation";
 import { getSupabaseUser } from "@/lib/supabase/server";
-
-const SIGN_IN_PATH = "/signin";
-const SIGN_OUT_PATH = "/auth/signout";
-const CALLBACK_PATH = "/auth/callback";
+import { SIGN_IN_PATH, SIGN_OUT_PATH, safeRelativeReturnPath } from "@/lib/safe-return-path";
 
 function supabaseConfigured() {
   return Boolean(
@@ -61,21 +58,3 @@ export function signOutPath(returnTo = "/") {
   return `${SIGN_OUT_PATH}?return_to=${encodeURIComponent(safeReturnTo)}`;
 }
 
-function safeRelativeReturnPath(value) {
-  if (typeof value !== "string" || !value.startsWith("/") || value.startsWith("//")) return "/";
-
-  let url;
-  try {
-    url = new URL(value, "https://app.local");
-  } catch {
-    return "/";
-  }
-  if (url.origin !== "https://app.local") return "/";
-  if (isReservedAuthPath(url.pathname)) return "/";
-
-  return `${url.pathname}${url.search}${url.hash}`;
-}
-
-function isReservedAuthPath(pathname) {
-  return pathname === SIGN_IN_PATH || pathname === SIGN_OUT_PATH || pathname === CALLBACK_PATH;
-}

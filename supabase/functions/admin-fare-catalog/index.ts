@@ -1,18 +1,8 @@
 import { requireAdmin } from "../_shared/admin-auth.ts";
+import { corsHeadersFor } from "../_shared/cors.ts";
 
 const MAX_ROWS = 500;
 const MAX_FARE = 10_000_000;
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Content-Type": "application/json",
-};
-
-function respond(body: Record<string, unknown>, status = 200) {
-  return new Response(JSON.stringify(body), { status, headers: corsHeaders });
-}
 
 function clean(value: unknown, max = 120) {
   return String(value ?? "").replace(/\s+/g, " ").trim().slice(0, max);
@@ -32,6 +22,10 @@ function routeKey(origin: string, destination: string) {
 }
 
 Deno.serve(async (request) => {
+  const corsHeaders = corsHeadersFor(request);
+  const respond = (body: Record<string, unknown>, status = 200) =>
+    new Response(JSON.stringify(body), { status, headers: corsHeaders });
+
   if (request.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }

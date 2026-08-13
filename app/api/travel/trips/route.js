@@ -35,9 +35,13 @@ function validFare(value) {
   return Number.isSafeInteger(number) && number >= 0 && number <= 10_000_000 ? number : null;
 }
 
+// travel_trips.id는 uuid 컬럼이고 화면도 crypto.randomUUID()로만 id를 만든다.
+// 형식을 여기서 맞춰 두어야 잘못된 값이 400으로 걸리고 DB까지 내려가 500이 되지 않는다.
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 function validTripId(value) {
   const id = String(value || "").trim();
-  return /^[0-9A-Za-z_-]{1,100}$/.test(id) ? id : "";
+  return UUID_PATTERN.test(id) ? id : "";
 }
 
 function fileValue(value) {

@@ -29,13 +29,27 @@ export default function AccountPasswordForm({ user, signOutPath }) {
     }
     setBusy(true);
     try {
-      const { error: updateError } = await getSupabaseBrowserClient().auth.updateUser({
+      const supabase = getSupabaseBrowserClient();
+      // GoTrue는 프로젝트 설정에 따라 current_password를 무시할 수 있고,
+      // Secure password change도 최근 24시간 안에 로그인한 세션은 그냥 통과시킨다.
+      // 그래서 현재 비밀번호는 앱에서 직접 확인한다. 이 재로그인은 세션도 새로
+      // 만들어 주므로 뒤따르는 updateUser가 재인증 요구에 걸리지 않는다.
+      const { error: reauthError } = await supabase.auth.signInWithPassword({
+        email: user.email,
+        password: currentPassword,
+      });
+      if (reauthError) throw new Error("현재 비밀번호가 올바르지 않습니다.");
+
+      const { error: updateError } = await supabase.auth.updateUser({
         password: newPassword,
         current_password: currentPassword,
       });
       if (updateError) {
         if (/current.*password|invalid.*password|credentials/i.test(updateError.message)) {
           throw new Error("현재 비밀번호가 올바르지 않습니다.");
+        }
+        if (/reauthentication/i.test(updateError.message)) {
+          throw new Error("보안 확인이 필요합니다. 다시 로그인한 뒤 시도해 주세요.");
         }
         throw updateError;
       }

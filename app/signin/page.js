@@ -3,10 +3,18 @@
 import { useEffect, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
 import { ORGANIZATION_CONFIG } from "@/config/organization";
+import { safeRelativeReturnPath } from "@/lib/safe-return-path";
+
+// 화면에 띄울 문구는 이 표에 있는 코드로만 정한다.
+const SIGN_IN_ERROR_MESSAGES = {
+  link_expired: "로그인 링크가 만료되었거나 이미 사용되었습니다.",
+};
 
 function safeReturnTo() {
-  const value = new URLSearchParams(window.location.search).get("return_to") || "/travel";
-  return value.startsWith("/") ? value : "/travel";
+  return safeRelativeReturnPath(
+    new URLSearchParams(window.location.search).get("return_to"),
+    { fallback: "/travel" },
+  );
 }
 
 export default function SignInPage() {
@@ -21,7 +29,10 @@ export default function SignInPage() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get("mode") === "reset") setMode("reset");
-    if (params.get("error")) setError(params.get("error"));
+    const errorCode = params.get("error");
+    if (errorCode) {
+      setError(SIGN_IN_ERROR_MESSAGES[errorCode] || "로그인을 처리하지 못했습니다. 다시 시도해 주세요.");
+    }
   }, []);
 
   function changeMode(nextMode) {

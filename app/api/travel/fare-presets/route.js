@@ -34,7 +34,19 @@ export async function POST(request) {
   const inputs = Array.isArray(body.presets) ? body.presets : [body];
   if (!inputs.length || inputs.length > 100) return NextResponse.json({ error: "한 번에 1개 이상 100개 이하의 노선을 올려 주세요." }, { status: 400 });
   const presets = inputs.map(normalize);
-  for (let i = 0; i < presets.length; i += 1) { const error = invalid(presets[i], inputs.length > 1 ? `${i + 1}행: ` : ""); if (error) return NextResponse.json({ error }, { status: 400 }); }
+  const seenInBatch = new Set();
+  for (let i = 0; i < presets.length; i += 1) {
+    const label = inputs.length > 1 ? `${i + 1}행: ` : "";
+    const error = invalid(presets[i], label);
+    if (error) return NextResponse.json({ error }, { status: 400 });
+    // 같은 노선이 한 요청에 두 번 들어오면 서로 다른 id가 만들어져
+    // 유니크 제약에 걸린다. 저장 전에 행 번호와 함께 되돌려 준다.
+    const key = routeKey(presets[i].origin, presets[i].destination);
+    if (seenInBatch.has(key)) {
+      return NextResponse.json({ error: `${label}같은 출발지·도착지가 중복됩니다.` }, { status: 400 });
+    }
+    seenInBatch.add(key);
+  }
   const { data: existing, error: listError } = await client.from("travel_fare_presets").select("id,origin,destination,created_at").order("updated_at", { ascending: false }).limit(100);
   if (listError) return NextResponse.json({ error: "기존 운임 설정을 확인하지 못했습니다." }, { status: 500 });
   const byRoute = new Map((existing || []).map((row) => [`${row.origin.toLocaleLowerCase("ko-KR")}\u0000${row.destination.toLocaleLowerCase("ko-KR")}`, row]));

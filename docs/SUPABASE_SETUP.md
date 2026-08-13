@@ -57,6 +57,9 @@ npx --yes supabase@2.113.0 seed buckets --linked
 2. 최소 비밀번호 길이를 8자로 설정하고 문자와 숫자를 요구합니다.
 3. 애플리케이션의 실제 Site URL과 허용 Redirect URL을 등록합니다.
 4. 관리자 생성 계정은 `email_confirm: true`로 만들어지므로 확인 메일 없이 로그인할 수 있습니다.
+5. Authentication > Providers > Email에서 **Secure password change**를 켭니다.
+
+내 계정 화면은 새 비밀번호를 저장하기 전에 현재 비밀번호로 재로그인해 본인 확인을 직접 수행합니다. 이 확인은 프로젝트 설정과 무관하게 항상 동작하므로 세션만 탈취한 사람은 비밀번호를 바꿀 수 없습니다. 위 5번은 그 위에 얹는 서버 측 방어입니다. `updateUser`에 전달하는 `current_password`는 GoTrue가 해당 옵션을 켠 프로젝트에서만 검증하므로 이 값에만 의존해서는 안 됩니다.
 
 ## 5. 최초 관리자와 Function 비밀값
 
@@ -70,7 +73,10 @@ npx --yes supabase@2.113.0 seed buckets --linked
 
 ```dotenv
 ADMIN_EMAILS=FIRST_ADMIN_EMAIL,SECOND_ADMIN_EMAIL
+ALLOWED_ORIGINS=https://YOUR-DEPLOYMENT.vercel.app
 ```
+
+`ALLOWED_ORIGINS`에는 관리자 화면을 여는 실제 배포 주소를 넣습니다. 두 관리자 Function은 이 목록에 있는 오리진에만 CORS를 허용하며, 비워 두면 예전처럼 모든 오리진을 허용합니다. 쉼표·세미콜론·공백으로 여러 주소를 구분할 수 있습니다.
 
 쉼표, 세미콜론 또는 줄바꿈으로 여러 주소를 구분할 수 있으며 비교 시 공백과 대소문자를 정규화합니다. 이 파일은 `supabase/.gitignore`의 `.env.*.local` 규칙으로 제외됩니다.
 

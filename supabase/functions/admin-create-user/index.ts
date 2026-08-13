@@ -1,4 +1,5 @@
 import { requireAdmin } from "../_shared/admin-auth.ts";
+import { corsHeadersFor } from "../_shared/cors.ts";
 
 const MAX_BULK_USERS = 100;
 const MAX_EMAIL_LENGTH = 240;
@@ -6,17 +7,6 @@ const MAX_NAME_LENGTH = 120;
 const MAX_PASSWORD_LENGTH = 128;
 const MAX_ROW_NUMBER = 1_000_000;
 const DUPLICATE_USER_CODES = new Set(["email_exists", "user_already_exists"]);
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Content-Type": "application/json",
-};
-
-function respond(body: Record<string, unknown>, status = 200) {
-  return new Response(JSON.stringify(body), { status, headers: corsHeaders });
-}
 
 function clean(value: unknown) {
   return typeof value === "string" ? value.replace(/\s+/g, " ").trim() : "";
@@ -36,6 +26,10 @@ function duplicateUserError(error: { code?: string; message?: string }) {
 }
 
 Deno.serve(async (request) => {
+  const corsHeaders = corsHeadersFor(request);
+  const respond = (body: Record<string, unknown>, status = 200) =>
+    new Response(JSON.stringify(body), { status, headers: corsHeaders });
+
   if (request.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }

@@ -24,6 +24,7 @@ Supabase가 필요한 기능은 [설정 안내](./docs/SUPABASE_SETUP.md)를 따
 - 파서 테스트 샘플은 이름, 이메일, 문서번호, 기관명 등 모든 개인정보를 비식별화합니다.
 - 생성 파일, 실제 승인 문서, `.env*`, Supabase/Vercel 프로젝트 연결 파일을 커밋하지 않습니다.
 - 사용자에게 표시되는 오류와 안내는 이해하기 쉬운 한국어로 작성합니다.
+- `pdfjs-dist` 버전을 올렸다면 `npm run sync:pdf-worker`로 `public/pdf.worker.min.mjs`도 함께 갱신합니다. 두 버전이 어긋나면 브라우저에서 PDF 추출이 전부 실패하며, `npm test`가 이를 잡아냅니다.
 
 ## 검증
 

@@ -29,15 +29,14 @@
     "build": "next build",
     "start": "next start",
     "test": "node --test",
+    "sync:pdf-worker": "node scripts/sync-pdf-worker.mjs",
     "check": "npm test && npm run build"
   },
   "dependencies": {
     "@mlc-ai/web-llm": "0.2.84",
     "@supabase/ssr": "0.12.4",
     "@supabase/supabase-js": "2.112.2",
-    "cfb": "1.2.2",
     "jszip": "3.10.1",
-    "kordoc": "4.7.2",
     "next": "15.5.23",
     "pdfjs-dist": "4.10.38",
     "react": "19.2.6",
