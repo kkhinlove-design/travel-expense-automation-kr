@@ -21,6 +21,7 @@ import {
   normalizeTripWaypoints,
   PROJECT_TYPES,
   TRANSPORT_TYPES,
+  tripAmountIssues,
   tripRoutePoints,
   tripRouteValidationError,
   tripTransportFares,
@@ -288,8 +289,14 @@ function parseFareImportRows(rows) {
   return presets;
 }
 
+// 숫자로 읽히지 않는 값을 0원으로 그리면 잘못된 금액이 화면에도 인쇄물에도
+// 그대로 찍힌다. 확정 전에 걸리도록 눈에 띄게 표시한다.
+const UNREADABLE_AMOUNT = "확인 필요";
+
 function money(value) {
-  return `${KRW.format(Number(value) || 0)}원`;
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return UNREADABLE_AMOUNT;
+  return `${KRW.format(Math.round(numeric))}원`;
 }
 
 function reportBasisKey(trip) {
@@ -650,7 +657,11 @@ export default function TravelWorkspace({ user, signOutPath }) {
   }
 
   function finalDocumentError() {
+    // 금액으로 읽지 못한 값이 남아 있으면 제출 서류를 만들지 않는다.
+    // 0원으로 채운 신청서가 그대로 결재에 올라가는 일을 막는다.
+    const amountIssue = tripAmountIssues(trip)[0];
     return sourceMismatch
+      || amountIssue
       || tripRouteValidationError(trip)
       || (trip.reportNeedsReview ? "출장 정보가 바뀌었습니다. 복명 내용을 다시 작성하거나 확인 완료해 주세요." : "");
   }
