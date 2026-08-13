@@ -39,6 +39,30 @@ function validFare(value) {
 // 형식을 여기서 맞춰 두어야 잘못된 값이 400으로 걸리고 DB까지 내려가 500이 되지 않는다.
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+// 출장자별 숙박비·감액은 계산에 그대로 들어가지만 지금까지 검사 없이 통과했다.
+// 숫자로 읽히지 않으면 계산기가 0원으로 바꿔 버리므로, 저장 단계에서 막는다.
+function participantAmountValidationError(trip) {
+  const participants = Array.isArray(trip?.participants) && trip.participants.length
+    ? trip.participants
+    : [{ employeeName: trip?.employeeName, lodgingActual: trip?.lodgingActual, deduction: trip?.deduction }];
+
+  for (let index = 0; index < participants.length; index += 1) {
+    const participant = participants[index] || {};
+    const who = String(participant.employeeName || "").trim() || `${index + 1}번째 출장자`;
+    const fields = [
+      ["숙박 실제 소요액", participant.lodgingActual ?? (index === 0 ? trip?.lodgingActual : 0)],
+      ["기타 감액", participant.deduction ?? (index === 0 ? trip?.deduction : 0)],
+    ];
+    for (const [label, value] of fields) {
+      if (value === undefined || value === null || value === "") continue;
+      if (validFare(value) === null) {
+        return `${who}의 ${label}은 0원 이상 1,000만 원 이하의 숫자로 입력해 주세요.`;
+      }
+    }
+  }
+  return "";
+}
+
 function validTripId(value) {
   const id = String(value || "").trim();
   return UUID_PATTERN.test(id) ? id : "";
@@ -218,6 +242,8 @@ export async function POST(request) {
   trip.outboundTransportActual = outbound;
   trip.returnTransportActual = returning;
   trip.transportActual = outbound + returning;
+  const participantAmountError = participantAmountValidationError(trip);
+  if (participantAmountError) return NextResponse.json({ error: participantAmountError }, { status: 400 });
   const routeError = tripRouteValidationError(trip);
   if (routeError) return NextResponse.json({ error: routeError }, { status: 400 });
   const expense = calculateTripExpense(trip);
