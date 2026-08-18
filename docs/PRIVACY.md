@@ -7,6 +7,7 @@
 | 동작 | 처리 위치 | 전송되는 정보 |
 | --- | --- | --- |
 | PDF/HWPX 선택 및 파싱 | 사용자의 브라우저 | 기본적으로 외부 전송 없음 |
+| 환경 설정 저장 | 기관의 Supabase | 로그인 사용자 ID와 기본 출발 사무소 |
 | 출장 저장 | 기관의 Supabase | 구조화된 출장 정보와 선택한 원본 PDF/HWPX |
 | Ollama 초안 | 사용자 PC의 `127.0.0.1` | 출장 정보와 결과 메모가 로컬 Ollama에 전달됨 |
 | WebGPU 초안 | 사용자의 브라우저 | 모델 파일 다운로드 후 프롬프트 추론은 브라우저 내부 처리 |
@@ -16,7 +17,7 @@
 ## Supabase 운영 원칙
 
 - 기관마다 별도 Supabase 프로젝트와 Vercel 배포를 사용하는 구성을 권장합니다.
-- 출장 테이블은 `auth.uid()` 기반 소유권 RLS를 적용하고, 공개 스키마 권한과 RLS를 모두 확인합니다.
+- 출장·개인 운임·환경 설정 테이블은 `auth.uid()` 기반 소유권 RLS를 적용하고, 공개 스키마 권한과 RLS를 모두 확인합니다.
 - 원본 버킷은 비공개로 유지하고 사용자 자신의 경로만 읽기·쓰기·삭제하도록 제한합니다.
 - secret/service role key는 Edge Function 또는 안전한 서버 환경에만 두고 `NEXT_PUBLIC_` 변수로 노출하지 않습니다.
 - 관리자 작업은 로그인 토큰을 다시 검증한 뒤 `app_metadata.role=admin` 또는 Supabase Function secret `ADMIN_EMAILS` allowlist로 권한을 확인합니다.

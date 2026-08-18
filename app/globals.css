@@ -59,6 +59,20 @@ button:disabled {
   opacity: 0.58;
 }
 
+@media (max-width: 520px) {
+  .account-settings-panel {
+    padding: 24px !important;
+  }
+
+  .account-preference-actions {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .account-preference-actions button {
+    width: 100%;
+  }
+}
+
 a {
   color: inherit;
   text-decoration: none;

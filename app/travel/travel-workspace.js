@@ -26,6 +26,7 @@ import {
   tripRouteValidationError,
   tripTransportFares,
 } from "@/lib/travel-rules";
+import { initialTripOrigin } from "@/lib/travel-user-preferences";
 import styles from "./travel.module.css";
 
 const KRW = new Intl.NumberFormat("ko-KR", { maximumFractionDigits: 0 });
@@ -145,11 +146,12 @@ function newParticipant(values = {}) {
   };
 }
 
-function blankTrip(user) {
+function blankTrip(user, defaultOrigin = "") {
   const participant = newParticipant({
     employeeName: user?.displayName?.includes("@") ? "" : user?.displayName ?? "",
     transportClaimant: true,
   });
+  const preferredOrigin = initialTripOrigin(defaultOrigin);
   return {
     id: crypto.randomUUID(),
     documentNumber: "",
@@ -162,7 +164,7 @@ function blankTrip(user) {
     purpose: "",
     destination: "",
     transportDestination: "",
-    origin: ORGANIZATION_CONFIG.originBases.length > 1 ? "" : ORGANIZATION_CONFIG.defaultOrigin,
+    origin: preferredOrigin,
     waypoints: [],
     startAt: "",
     endAt: "",
@@ -523,8 +525,8 @@ function PrintBundle({ trip, expense }) {
   );
 }
 
-export default function TravelWorkspace({ user, signOutPath }) {
-  const [trip, setTrip] = useState(() => blankTrip(user));
+export default function TravelWorkspace({ user, defaultOrigin, signOutPath }) {
+  const [trip, setTrip] = useState(() => blankTrip(user, defaultOrigin));
   const [approvedPdfFile, setApprovedPdfFile] = useState(null);
   const [sourceHwpxFile, setSourceHwpxFile] = useState(null);
   const [approvedPdfPending, setApprovedPdfPending] = useState(false);
@@ -543,7 +545,9 @@ export default function TravelWorkspace({ user, signOutPath }) {
   const [ollamaAllowedOrigin, setOllamaAllowedOrigin] = useState(ORGANIZATION_CONFIG.publicAppUrl);
   const [aiProgress, setAiProgress] = useState({ progress: 0, text: "" });
   const [busy, setBusy] = useState("");
-  const [notice, setNotice] = useState("승인 PDF 또는 원본 HWPX를 올려주세요. 두 파일을 함께 올리면 HWPX 표를 우선 적용합니다.");
+  const [notice, setNotice] = useState(() => defaultOrigin
+    ? `기본 출발지는 ${defaultOrigin} 사무소입니다. 승인 PDF 또는 원본 HWPX를 올려주세요.`
+    : "승인 PDF 또는 원본 HWPX를 올려주세요. 두 파일을 함께 올리면 HWPX 표를 우선 적용합니다.");
   const [activeSection, setActiveSection] = useState("review");
   const pdfInputRef = useRef(null);
   const hwpxInputRef = useRef(null);
@@ -965,6 +969,7 @@ export default function TravelWorkspace({ user, signOutPath }) {
       ...trip,
       ...parsed,
       id: trip.id,
+      origin: String(parsed.origin || "").trim() || trip.origin || defaultOrigin || "",
       participants: parsedParticipants,
       reporterParticipantId: parsedParticipants[0].id,
       department: parsedParticipants[0].department,
@@ -1464,7 +1469,7 @@ export default function TravelWorkspace({ user, signOutPath }) {
   function resetTrip() {
     parseRequestRef.current += 1;
     setBusy("");
-    setTrip(blankTrip(user));
+    setTrip(blankTrip(user, defaultOrigin));
     setApprovedPdfFile(null);
     setSourceHwpxFile(null);
     setApprovedPdfPending(false);
@@ -1476,7 +1481,9 @@ export default function TravelWorkspace({ user, signOutPath }) {
     setFareDirection("outbound");
     setFareNotice("");
     setAiProgress({ progress: 0, text: "" });
-    setNotice("새 출장신청 PDF 또는 HWPX를 올려주세요.");
+    setNotice(defaultOrigin
+      ? `새 출장의 기본 출발지를 ${defaultOrigin} 사무소로 적용했습니다.`
+      : "새 출장신청 PDF 또는 HWPX를 올려주세요.");
   }
 
   return (
@@ -1484,7 +1491,7 @@ export default function TravelWorkspace({ user, signOutPath }) {
       <header className={styles.header}>
         <a href="/" className={styles.brand}><span>出</span><div><strong>{ORGANIZATION_CONFIG.appName}</strong><small>{ORGANIZATION_CONFIG.brandEnglish}</small></div></a>
         <nav aria-label="주요 메뉴"><a className={activeSection === "settings" ? "" : styles.navActive} href="#workspace" onClick={() => { if (activeSection === "settings") setActiveSection("review"); }}>새 서류</a><a href="#recent">내 출장</a><a href="#policy">규정 기준</a><a className={activeSection === "settings" ? styles.navActive : ""} href="#workspace" onClick={() => setActiveSection("settings")}>운임 설정</a></nav>
-        <div className={styles.account}><span>{(user.displayName || user.email).slice(0, 1).toUpperCase()}</span><div><strong>{user.displayName}</strong><small>{user.email}</small></div><a href="/account">내 계정</a><a href={signOutPath}>로그아웃</a></div>
+        <div className={styles.account}><span>{(user.displayName || user.email).slice(0, 1).toUpperCase()}</span><div><strong>{user.displayName}</strong><small>{user.email}</small></div><a href="/account">환경 설정</a><a href={signOutPath}>로그아웃</a></div>
       </header>
 
       <section className={styles.hero}>

@@ -78,7 +78,7 @@
 | 출장 경로 | 여러 출장자 · 교통비 대표 1명 · 경유지 · 가는 길/오는 길 차등 운임 |
 | 여비 계산 | 개인차·법인차·대중교통 · 장기 체류 · 제공 식사 · 지역별 숙박 상한 · 개인별 정산 |
 | 산출물 | 여비지급신청서 · 여비지출명세서 · 출장복명서 · Excel · A4 인쇄/PDF |
-| 운영 | 이메일/비밀번호 로그인 · 직원/공용 운임 Excel 등록 · 사용자별 저장·삭제 · 원본 보관 |
+| 운영 | 이메일/비밀번호 로그인 · 개인별 기본 출발 사무소 · 직원/공용 운임 Excel 등록 · 사용자별 저장·삭제 · 원본 보관 |
 | 로컬 AI | PC의 Ollama 또는 지원 브라우저의 WebGPU로 출장복명서 초안 작성 |
 
 ## 도입 전에 확인하세요
@@ -148,7 +148,7 @@ npm run build
 | `NEXT_PUBLIC_ADMIN_EMAIL` | 조건부 | 브라우저 | 쉬운 최초 설치용 관리자 UI 이메일. `app_metadata.role=admin`을 쓰면 생략 가능 |
 | `DATA_GO_KR_SERVICE_KEY` | 아니요 | 서버 | TAGO 연동 서버 코드용 일반인증키. 현재 기본 UI는 비활성화되어 있으며 저장 운임·직접 입력을 우선 사용합니다. |
 
-기관명·앱 이름·출발 기준지와 Ollama 모델 등 선택 설정은 주석이 포함된 [`.env.example`](./.env.example)에서 확인할 수 있습니다. 여러 사무소는 `NEXT_PUBLIC_ORIGIN_BASES`에 쉼표로 구분해 입력하며, 목록이 두 곳 이상이면 새 출장마다 실제 출발 사무소를 선택합니다. `ALLOW_LOCAL_DEV_USER=true`는 Supabase 없이 UI를 확인하는 로컬 개발에서만 사용하고 Vercel에는 설정하지 마세요.
+기관명·앱 이름·출발 기준지와 Ollama 모델 등 선택 설정은 주석이 포함된 [`.env.example`](./.env.example)에서 확인할 수 있습니다. 여러 사무소는 `NEXT_PUBLIC_ORIGIN_BASES`에 쉼표로 구분해 입력합니다. 로그인한 직원은 **환경 설정**에서 기본 출발 사무소를 저장할 수 있고, 출장마다 실제 출발지가 다르면 정보 확인 화면에서 바꿀 수 있습니다. `ALLOW_LOCAL_DEV_USER=true`는 Supabase 없이 UI를 확인하는 로컬 개발에서만 사용하고 Vercel에는 설정하지 마세요.
 
 이메일 기반 초기 관리자를 사용할 때는 `NEXT_PUBLIC_ADMIN_EMAIL`과 별도로 Supabase Function secret `ADMIN_EMAILS`에도 같은 이메일을 설정해야 합니다. 전자는 UI 진입용 공개 힌트이고, 실제 관리자 작업 권한은 후자의 서버 allowlist가 검증합니다. 자세한 권한 구성은 [Supabase 설정 안내](./docs/SUPABASE_SETUP.md)를 따르세요.
 

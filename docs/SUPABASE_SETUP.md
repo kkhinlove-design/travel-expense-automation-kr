@@ -6,6 +6,7 @@
 
 - `public.travel_trips`: 로그인 사용자별 출장/정산 데이터
 - `public.travel_fare_presets`: 로그인 사용자별 개인 운임 기준
+- `public.travel_user_preferences`: 로그인 사용자별 기본 출발 사무소
 - `public.travel_fare_catalog`: 전 직원이 읽는 관리자 공용 운임 기준
 - 비공개 Storage 버킷 `travel-sources`
 - Edge Function `admin-create-user`, `admin-fare-catalog`
@@ -35,7 +36,7 @@ npx --yes supabase@2.113.0 db reset
 npx --yes supabase@2.113.0 status
 ```
 
-`db reset`이 성공하면 세 테이블, RLS 정책, `travel-sources` 버킷이 로컬 DB에 생성됩니다. 로컬 작업을 마친 뒤에는 `npx --yes supabase@2.113.0 stop`으로 종료할 수 있습니다.
+`db reset`이 성공하면 네 테이블, RLS 정책, `travel-sources` 버킷이 로컬 DB에 생성됩니다. 로컬 작업을 마친 뒤에는 `npx --yes supabase@2.113.0 stop`으로 종료할 수 있습니다.
 
 ## 3. 원격 프로젝트 연결과 마이그레이션
 
@@ -116,7 +117,7 @@ Dashboard SQL Editor에서 다음 읽기 전용 쿼리로 스키마와 정책을
 select schemaname, tablename, rowsecurity
 from pg_tables
 where schemaname = 'public'
-  and tablename in ('travel_trips', 'travel_fare_presets', 'travel_fare_catalog')
+  and tablename in ('travel_trips', 'travel_fare_presets', 'travel_user_preferences', 'travel_fare_catalog')
 order by tablename;
 
 select schemaname, tablename, policyname, roles, cmd
@@ -128,7 +129,7 @@ order by schemaname, tablename, policyname;
 select grantee, table_name, privilege_type
 from information_schema.role_table_grants
 where table_schema = 'public'
-  and table_name in ('travel_trips', 'travel_fare_presets', 'travel_fare_catalog')
+  and table_name in ('travel_trips', 'travel_fare_presets', 'travel_user_preferences', 'travel_fare_catalog')
   and grantee in ('anon', 'authenticated', 'service_role')
 order by table_name, grantee, privilege_type;
 
@@ -139,7 +140,7 @@ where id = 'travel-sources';
 
 최종 권한 검증은 서로 다른 테스트 사용자 A/B로 수행합니다.
 
-1. A가 만든 `travel_trips`와 `travel_fare_presets`가 B에게 조회·수정·삭제되지 않아야 합니다.
+1. A가 만든 `travel_trips`, `travel_fare_presets`, `travel_user_preferences`가 B에게 조회·수정·삭제되지 않아야 합니다.
 2. B가 `travel/A_USER_ID/...` 경로에 파일을 올리거나 읽으려 하면 거부되어야 합니다.
 3. 로그인 사용자는 `travel_fare_catalog`를 읽을 수 있지만 직접 쓰기는 거부되어야 합니다.
 4. 일반 직원의 두 관리자 Function 호출은 `403`이어야 합니다.
