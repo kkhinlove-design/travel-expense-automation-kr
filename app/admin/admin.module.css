@@ -34,6 +34,7 @@
   font: inherit;
   font-size: 14px;
   font-weight: 700;
+  white-space: nowrap;
   cursor: pointer;
 }
 
