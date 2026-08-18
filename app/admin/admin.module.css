@@ -1,0 +1,250 @@
+.userSection {
+  width: min(100%, 920px);
+  box-sizing: border-box;
+  padding: 32px;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 14px 50px #1d2b4418;
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.sectionHeader h2 {
+  margin: 0;
+}
+
+.sectionHeader p {
+  margin: 8px 0 0;
+  color: #667085;
+  line-height: 1.6;
+}
+
+.refreshButton,
+.editButton,
+.cancelButton,
+.saveButton {
+  min-height: 44px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.refreshButton,
+.cancelButton {
+  border: 1px solid #b9c7dc;
+  background: #f5f8fc;
+  color: #214b8e;
+}
+
+.editButton {
+  border: 1px solid #c7d4e8;
+  background: #fff;
+  color: #214b8e;
+}
+
+.saveButton {
+  border: 0;
+  background: #214b8e;
+  color: #fff;
+}
+
+.refreshButton:disabled,
+.editButton:disabled,
+.cancelButton:disabled,
+.saveButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.searchInput {
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 18px;
+  padding: 13px 14px;
+  border: 1px solid #ccd4e0;
+  border-radius: 9px;
+  font: inherit;
+  font-size: 16px;
+}
+
+.listSummary {
+  margin: 12px 0;
+  color: #475467;
+  font-size: 14px;
+}
+
+.userList {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.userCard {
+  padding: 18px;
+  border: 1px solid #e4e7ec;
+  border-radius: 12px;
+  background: #fcfdff;
+}
+
+.userOverview {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.userIdentity {
+  min-width: 0;
+}
+
+.userNameLine {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.userNameLine strong {
+  font-size: 16px;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #eaf2ff;
+  color: #214b8e;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.userEmail {
+  margin: 6px 0 0;
+  overflow-wrap: anywhere;
+  color: #475467;
+  font-size: 14px;
+}
+
+.userMeta {
+  margin: 8px 0 0;
+  color: #7a8494;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.editor {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid #e4e7ec;
+}
+
+.editor label {
+  display: grid;
+  gap: 8px;
+  color: #344054;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.editor input {
+  min-width: 0;
+  padding: 12px 13px;
+  border: 1px solid #ccd4e0;
+  border-radius: 8px;
+  font: inherit;
+  font-size: 16px;
+}
+
+.editor input:disabled {
+  background: #f2f4f7;
+  color: #667085;
+}
+
+.passwordField,
+.editorHint,
+.editorActions {
+  grid-column: 1 / -1;
+}
+
+.editorHint {
+  margin: 0;
+  color: #667085;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.editorActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.successMessage,
+.errorMessage,
+.emptyMessage {
+  margin: 14px 0 0;
+  line-height: 1.6;
+  font-size: 14px;
+}
+
+.successMessage {
+  color: #16704f;
+}
+
+.errorMessage {
+  color: #b42318;
+}
+
+.emptyMessage {
+  padding: 20px;
+  border-radius: 10px;
+  background: #f8fafc;
+  color: #667085;
+  text-align: center;
+}
+
+@media (max-width: 700px) {
+  .userSection {
+    padding: 22px 18px;
+  }
+
+  .sectionHeader,
+  .userOverview {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .refreshButton,
+  .editButton {
+    width: 100%;
+  }
+
+  .editor {
+    grid-template-columns: 1fr;
+  }
+
+  .editor label,
+  .passwordField,
+  .editorHint,
+  .editorActions {
+    grid-column: 1;
+  }
+
+  .editorActions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+}

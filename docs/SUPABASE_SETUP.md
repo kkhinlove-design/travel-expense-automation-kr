@@ -9,7 +9,7 @@
 - `public.travel_user_preferences`: 로그인 사용자별 기본 출발 사무소
 - `public.travel_fare_catalog`: 전 직원이 읽는 관리자 공용 운임 기준
 - 비공개 Storage 버킷 `travel-sources`
-- Edge Function `admin-create-user`, `admin-fare-catalog`
+- Edge Function `admin-create-user`, `admin-fare-catalog`, `admin-manage-users`
 - 사용자 소유권 RLS, Storage 경로 소유권 정책, 명시적 Data API 권한
 
 SQL 마이그레이션은 재실행해도 정책과 버킷 설정이 같은 상태가 되도록 작성했습니다. 이미 배포한 마이그레이션을 수정하지 말고, 이후 변경은 `supabase migration new <name>`으로 새 파일을 추가합니다.
@@ -64,7 +64,7 @@ npx --yes supabase@2.113.0 seed buckets --linked
 
 ## 5. 최초 관리자와 Function 비밀값
 
-두 관리자 Function은 요청의 Bearer 토큰을 Supabase Auth 서버에서 다시 검증한 뒤 다음 중 하나일 때만 허용합니다.
+세 관리자 Function은 요청의 Bearer 토큰을 Supabase Auth 서버에서 다시 검증한 뒤 다음 중 하나일 때만 허용합니다.
 
 - 검증된 사용자의 `app_metadata.role`이 `admin` 또는 `super_admin`
 - 검증된 사용자의 `app_metadata.roles` 배열에 `admin` 또는 `super_admin`이 포함됨
@@ -77,7 +77,7 @@ ADMIN_EMAILS=FIRST_ADMIN_EMAIL,SECOND_ADMIN_EMAIL
 ALLOWED_ORIGINS=https://YOUR-DEPLOYMENT.vercel.app
 ```
 
-`ALLOWED_ORIGINS`에는 관리자 화면을 여는 실제 배포 주소를 넣습니다. 두 관리자 Function은 이 목록에 있는 오리진에만 CORS를 허용하며, 비워 두면 예전처럼 모든 오리진을 허용합니다. 쉼표·세미콜론·공백으로 여러 주소를 구분할 수 있습니다.
+`ALLOWED_ORIGINS`에는 관리자 화면을 여는 실제 배포 주소를 넣습니다. 세 관리자 Function은 이 목록에 있는 오리진에만 CORS를 허용하며, 비워 두면 예전처럼 모든 오리진을 허용합니다. 쉼표·세미콜론·공백으로 여러 주소를 구분할 수 있습니다.
 
 쉼표, 세미콜론 또는 줄바꿈으로 여러 주소를 구분할 수 있으며 비교 시 공백과 대소문자를 정규화합니다. 이 파일은 `supabase/.gitignore`의 `.env.*.local` 규칙으로 제외됩니다.
 
@@ -85,7 +85,7 @@ ALLOWED_ORIGINS=https://YOUR-DEPLOYMENT.vercel.app
 
 ```powershell
 npx --yes supabase@2.113.0 secrets set --env-file supabase/.env.functions.local
-npx --yes supabase@2.113.0 functions deploy admin-create-user admin-fare-catalog
+npx --yes supabase@2.113.0 functions deploy admin-create-user admin-fare-catalog admin-manage-users
 ```
 
 조직에서 서버 측 Admin API로 `app_metadata.role=admin` 또는 `app_metadata.roles=["admin"]`을 관리한다면 `ADMIN_EMAILS` 없이도 동작합니다. 역할은 반드시 Supabase Admin API처럼 비밀키를 보유한 신뢰 서버에서만 변경해야 합니다.

@@ -5,9 +5,47 @@ import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
 import { parseStaffAccountRows } from "@/lib/staff-account-import";
 import { parseFareCatalogRows } from "@/lib/fare-catalog-import";
 import { ADMIN_UI_CONFIG, hasAdminUiAccess } from "@/config/admin";
+import styles from "./admin.module.css";
 
 const MAX_BULK_USERS = 100;
 const MAX_FARE_ROWS = 500;
+
+async function edgeFunctionErrorCode(invokeError) {
+  const response = invokeError?.context;
+  if (!response || typeof response.clone !== "function") return "";
+  try {
+    return String((await response.clone().json())?.error || "");
+  } catch {
+    return "";
+  }
+}
+
+function editErrorMessage(code) {
+  const messages = {
+    valid_email_required: "올바른 이메일을 입력해 주세요.",
+    email_too_long: "이메일이 너무 깁니다.",
+    name_required: "이름을 입력해 주세요.",
+    name_too_long: "이름이 너무 깁니다.",
+    password_min_8: "새 비밀번호는 8자 이상이어야 합니다.",
+    password_too_long: "새 비밀번호는 128자 이하여야 합니다.",
+    protected_admin_credentials: "관리자 계정의 이메일과 비밀번호는 이 화면에서 변경할 수 없습니다.",
+    reserved_admin_email: "관리자 권한용 이메일은 직원 계정에 지정할 수 없습니다.",
+    user_exists: "이미 등록된 이메일입니다.",
+    user_not_found: "해당 계정을 찾지 못했습니다. 목록을 새로고침해 주세요.",
+    forbidden: "관리자 권한이 없습니다.",
+  };
+  return messages[code] || "직원 계정을 수정하지 못했습니다.";
+}
+
+function formatDateTime(value) {
+  if (!value) return "로그인 기록 없음";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "로그인 기록 확인 불가";
+  return new Intl.DateTimeFormat("ko-KR", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(date);
+}
 
 export default function AdminPage() {
   const [allowed, setAllowed] = useState(null);
@@ -27,6 +65,16 @@ export default function AdminPage() {
   const [fareBusy, setFareBusy] = useState(false);
   const [fareMessage, setFareMessage] = useState("");
   const [fareError, setFareError] = useState("");
+  const [managedUsers, setManagedUsers] = useState([]);
+  const [userSearch, setUserSearch] = useState("");
+  const [usersBusy, setUsersBusy] = useState(false);
+  const [usersMessage, setUsersMessage] = useState("");
+  const [usersError, setUsersError] = useState("");
+  const [editingUserId, setEditingUserId] = useState("");
+  const [editEmail, setEditEmail] = useState("");
+  const [editFullName, setEditFullName] = useState("");
+  const [editPassword, setEditPassword] = useState("");
+  const [editBusy, setEditBusy] = useState(false);
 
   useEffect(() => {
     getSupabaseBrowserClient().auth.getUser().then(({ data, error: userError }) => {
@@ -35,8 +83,73 @@ export default function AdminPage() {
       const isAdmin = !userError && hasAdminUiAccess(data.user);
       setAllowed(isAdmin);
       if (!isAdmin) setError("관리자 권한이 있는 계정으로 로그인해야 합니다.");
+      else loadManagedUsers();
     });
   }, []);
+
+  async function loadManagedUsers({ quiet = false } = {}) {
+    setUsersBusy(true);
+    setUsersError("");
+    if (!quiet) setUsersMessage("");
+    const { data, error: invokeError } = await getSupabaseBrowserClient().functions.invoke(
+      "admin-manage-users",
+      { body: { action: "list" } },
+    );
+    const code = data?.error || await edgeFunctionErrorCode(invokeError);
+    if (invokeError || code) {
+      setUsersError(code === "forbidden" ? "관리자 권한이 없습니다." : "직원 목록을 불러오지 못했습니다. 함수 배포 상태를 확인해 주세요.");
+    } else {
+      setManagedUsers(Array.isArray(data?.users) ? data.users : []);
+      if (data?.truncated) setUsersMessage("처음 1,000개 계정만 표시하고 있습니다.");
+    }
+    setUsersBusy(false);
+  }
+
+  function startEditingUser(user) {
+    setEditingUserId(user.id);
+    setEditEmail(user.email);
+    setEditFullName(user.fullName);
+    setEditPassword("");
+    setUsersMessage("");
+    setUsersError("");
+  }
+
+  function cancelEditingUser() {
+    setEditingUserId("");
+    setEditEmail("");
+    setEditFullName("");
+    setEditPassword("");
+  }
+
+  async function saveManagedUser(event, user) {
+    event.preventDefault();
+    setEditBusy(true);
+    setUsersMessage("");
+    setUsersError("");
+    const { data, error: invokeError } = await getSupabaseBrowserClient().functions.invoke(
+      "admin-manage-users",
+      {
+        body: {
+          action: "update",
+          user: {
+            id: user.id,
+            email: editEmail.trim(),
+            fullName: editFullName.trim(),
+            password: editPassword,
+          },
+        },
+      },
+    );
+    const code = data?.error || await edgeFunctionErrorCode(invokeError);
+    if (invokeError || code) {
+      setUsersError(editErrorMessage(code));
+    } else if (data?.user) {
+      setManagedUsers((current) => current.map((item) => item.id === data.user.id ? data.user : item));
+      setUsersMessage(`${data.user.fullName || data.user.email} 계정 정보를 수정했습니다.${data.passwordChanged ? " 새 비밀번호도 적용했습니다." : ""}`);
+      cancelEditingUser();
+    }
+    setEditBusy(false);
+  }
 
   async function submit(event) {
     event.preventDefault();
@@ -58,6 +171,7 @@ export default function AdminPage() {
       setEmail("");
       setFullName("");
       setPassword("");
+      loadManagedUsers({ quiet: true });
     }
     setBusy(false);
   }
@@ -99,6 +213,7 @@ export default function AdminPage() {
       setBulkMessage(`엑셀 등록 완료: 새 계정 ${created}명 · 이미 등록된 계정 ${duplicates}명 · 실패 ${failed}명`);
       setBulkRows([]);
       setBulkFileName("");
+      loadManagedUsers({ quiet: true });
     }
     setBulkBusy(false);
   }
@@ -143,10 +258,17 @@ export default function AdminPage() {
   if (allowed === null) return <main style={{ padding: 40 }}>관리자 권한을 확인하는 중…</main>;
   if (!allowed) return <main style={{ padding: 40 }}><p role="alert">{error}</p><a href="/signin">로그인 화면으로 이동</a></main>;
 
+  const normalizedSearch = userSearch.trim().toLocaleLowerCase("ko-KR");
+  const visibleUsers = managedUsers.filter((user) =>
+    !normalizedSearch
+    || user.email.toLocaleLowerCase("ko-KR").includes(normalizedSearch)
+    || user.fullName.toLocaleLowerCase("ko-KR").includes(normalizedSearch)
+  );
+
   return (
     <main style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", gap: 20, padding: 24, background: "#f4f6fa" }}>
       <form onSubmit={submit} style={{ width: "min(100%, 480px)", padding: 32, borderRadius: 18, background: "#fff", boxShadow: "0 14px 50px #1d2b4418" }}>
-        <h1 style={{ margin: "0 0 8px" }}>직원 계정 관리</h1>
+        <h1 style={{ margin: "0 0 8px" }}>직원 계정 만들기</h1>
         <p style={{ color: "#667085", lineHeight: 1.6 }}>{ADMIN_UI_CONFIG.fallbackEmail ? <>관리자 안내 계정: {ADMIN_UI_CONFIG.fallbackEmail}<br /></> : null}직원 이메일과 초기 비밀번호를 입력해 계정을 만들어 주세요.</p>
         <label style={{ display: "block", marginTop: 18, fontWeight: 700 }}>직원 이메일</label>
         <input required type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="off" style={{ width: "100%", boxSizing: "border-box", margin: "8px 0 14px", padding: 13, border: "1px solid #ccd4e0", borderRadius: 8 }} />
@@ -159,6 +281,77 @@ export default function AdminPage() {
         {message ? <p style={{ color: "#315895", lineHeight: 1.6 }}>{message}</p> : null}
         {error ? <p role="alert" style={{ color: "#b42318", lineHeight: 1.6 }}>{error}</p> : null}
       </form>
+      <section className={styles.userSection} aria-labelledby="managed-user-heading">
+        <div className={styles.sectionHeader}>
+          <div>
+            <h2 id="managed-user-heading">등록 직원 편집</h2>
+            <p>직원의 이름·이메일을 수정하거나 새 비밀번호를 설정할 수 있습니다. 관리자 계정의 로그인 정보는 보호됩니다.</p>
+          </div>
+          <button type="button" className={styles.refreshButton} onClick={() => loadManagedUsers()} disabled={usersBusy || editBusy}>
+            {usersBusy ? "불러오는 중…" : "목록 새로고침"}
+          </button>
+        </div>
+        <label>
+          <span style={{ display: "block", marginTop: 18, fontWeight: 700 }}>직원 검색</span>
+          <input
+            className={styles.searchInput}
+            type="search"
+            value={userSearch}
+            onChange={(event) => setUserSearch(event.target.value)}
+            placeholder="이름 또는 이메일"
+            autoComplete="off"
+          />
+        </label>
+        <p className={styles.listSummary}>전체 {managedUsers.length}명 · 검색 결과 {visibleUsers.length}명</p>
+        {usersMessage ? <p className={styles.successMessage}>{usersMessage}</p> : null}
+        {usersError ? <p role="alert" className={styles.errorMessage}>{usersError}</p> : null}
+        {!usersBusy && !visibleUsers.length ? <p className={styles.emptyMessage}>조건에 맞는 직원 계정이 없습니다.</p> : null}
+        <div className={styles.userList}>
+          {visibleUsers.map((user) => {
+            const editing = editingUserId === user.id;
+            const credentialsLocked = user.isProtectedAdmin;
+            return (
+              <article className={styles.userCard} key={user.id}>
+                <div className={styles.userOverview}>
+                  <div className={styles.userIdentity}>
+                    <div className={styles.userNameLine}>
+                      <strong>{user.fullName || "이름 미등록"}</strong>
+                      {user.isCurrentUser ? <span className={styles.badge}>현재 로그인</span> : null}
+                      {user.isProtectedAdmin ? <span className={styles.badge}>관리자 보호</span> : null}
+                    </div>
+                    <p className={styles.userEmail}>{user.email}</p>
+                    <p className={styles.userMeta}>최근 로그인: {formatDateTime(user.lastSignInAt)} · {user.emailConfirmed ? "이메일 확인됨" : "이메일 미확인"}</p>
+                  </div>
+                  <button type="button" className={styles.editButton} onClick={() => startEditingUser(user)} disabled={editBusy || (editingUserId && !editing)}>
+                    {editing ? "편집 중" : "편집"}
+                  </button>
+                </div>
+                {editing ? (
+                  <form className={styles.editor} onSubmit={(event) => saveManagedUser(event, user)}>
+                    <label>
+                      이름
+                      <input required maxLength={120} value={editFullName} onChange={(event) => setEditFullName(event.target.value)} autoComplete="off" />
+                    </label>
+                    <label>
+                      이메일
+                      <input required maxLength={240} type="email" value={editEmail} onChange={(event) => setEditEmail(event.target.value)} disabled={credentialsLocked} autoComplete="off" />
+                    </label>
+                    <label className={styles.passwordField}>
+                      새 비밀번호
+                      <input minLength={8} maxLength={128} type="password" value={editPassword} onChange={(event) => setEditPassword(event.target.value)} disabled={credentialsLocked} autoComplete="new-password" placeholder={credentialsLocked ? "관리자 계정은 변경할 수 없습니다" : "변경할 때만 8자 이상 입력"} />
+                    </label>
+                    <p className={styles.editorHint}>{credentialsLocked ? "관리자 계정은 이름만 수정할 수 있습니다." : "새 비밀번호를 비워 두면 기존 비밀번호가 유지됩니다. 비밀번호는 화면에 저장하거나 다시 표시하지 않습니다."}</p>
+                    <div className={styles.editorActions}>
+                      <button type="button" className={styles.cancelButton} onClick={cancelEditingUser} disabled={editBusy}>취소</button>
+                      <button type="submit" className={styles.saveButton} disabled={editBusy}>{editBusy ? "저장 중…" : "변경 저장"}</button>
+                    </div>
+                  </form>
+                ) : null}
+              </article>
+            );
+          })}
+        </div>
+      </section>
       <section style={{ width: "min(100%, 720px)", boxSizing: "border-box", padding: 32, borderRadius: 18, background: "#fff", boxShadow: "0 14px 50px #1d2b4418" }}>
         <h2 style={{ margin: 0 }}>엑셀로 직원 일괄 등록</h2>
         <p style={{ color: "#667085", lineHeight: 1.6 }}>양식에 이메일·이름·초기 비밀번호를 한 줄씩 입력한 뒤 업로드하세요. 한 번에 최대 {MAX_BULK_USERS}명까지 등록할 수 있습니다.</p>

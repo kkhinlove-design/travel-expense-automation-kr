@@ -399,6 +399,11 @@ enabled = true
 verify_jwt = true
 entrypoint = "./functions/admin-fare-catalog/index.ts"
 
+[functions.admin-manage-users]
+enabled = true
+verify_jwt = true
+entrypoint = "./functions/admin-manage-users/index.ts"
+
 # [edge_runtime.secrets]
 # secret_key = "env(SECRET_VALUE)"
 
