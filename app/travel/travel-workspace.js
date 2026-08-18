@@ -16,6 +16,7 @@ import {
 } from "@/lib/local-report-ai";
 import {
   calculateTripExpense,
+  fareGradeForDocument,
   LABOR_MEAL_REGIONS,
   LODGING_CAPS,
   normalizeTripWaypoints,
@@ -444,8 +445,8 @@ function ParticipantApplication({ trip, item, transportLabel, today }) {
   const provided = participant.mealsProvided ?? {};
   const fares = participantTransportFares(trip, item);
   const hasDirectionalSources = Boolean(trip.fareSources?.outbound || trip.fareSources?.return);
-  const outboundGrade = participant.transportClaimant ? trip.fareSources?.outbound?.grade || (!hasDirectionalSources ? trip.fareSource?.grade : null) || "-" : "동승";
-  const returnGrade = participant.transportClaimant ? trip.fareSources?.return?.grade || (!hasDirectionalSources ? trip.fareSource?.grade : null) || "-" : "동승";
+  const outboundGrade = participant.transportClaimant ? fareGradeForDocument(trip.fareSources?.outbound?.grade || (!hasDirectionalSources ? trip.fareSource?.grade : null)) : "동승";
+  const returnGrade = participant.transportClaimant ? fareGradeForDocument(trip.fareSources?.return?.grade || (!hasDirectionalSources ? trip.fareSource?.grade : null)) : "동승";
   return (
     <article className={styles.a4Portrait}>
       <h1>여비지급신청서</h1>

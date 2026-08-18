@@ -3,9 +3,17 @@ import test from "node:test";
 
 import {
   calculateTripExpense,
+  fareGradeForDocument,
   tripRoutePoints,
   tripTransportFares,
 } from "../lib/travel-rules.js";
+
+test("hides recognized and manual fare labels only in document grade cells", () => {
+  assert.equal(fareGradeForDocument("인정 운임"), "");
+  assert.equal(fareGradeForDocument("수동운임"), "");
+  assert.equal(fareGradeForDocument("우등"), "우등");
+  assert.equal(fareGradeForDocument(""), "-");
+});
 
 function baseTrip(overrides = {}) {
   return {
