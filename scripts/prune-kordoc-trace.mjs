@@ -1,4 +1,4 @@
-import { readFile, stat, writeFile } from "node:fs/promises";
+import { readFile, readdir, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 const tracePath = path.join(
@@ -36,6 +36,20 @@ function isUnusedOptionalDependency(file) {
   return unusedOptionalPackageSegments.some((segment) => filePath.includes(segment));
 }
 
+async function packageFiles(packageName) {
+  const packageRoot = path.join(process.cwd(), "node_modules", packageName);
+  const files = [];
+  async function visit(directory) {
+    for (const entry of await readdir(directory, { withFileTypes: true })) {
+      const absolute = path.join(directory, entry.name);
+      if (entry.isDirectory()) await visit(absolute);
+      else if (entry.isFile()) files.push(path.relative(traceDirectory, absolute));
+    }
+  }
+  await visit(packageRoot);
+  return files;
+}
+
 async function tracedBytes(files) {
   let total = 0;
   for (const file of files) {
@@ -52,9 +66,20 @@ const trace = JSON.parse(await readFile(tracePath, "utf8"));
 if (!Array.isArray(trace.files)) throw new Error("Kordoc API의 Next trace 형식이 올바르지 않습니다.");
 
 const before = trace.files;
-const after = before.filter((file) => !isUnusedOptionalDependency(file));
+const requiredDynamicPackages = ["cfb", "adler-32", "crc-32"];
+const requiredDynamicFiles = (await Promise.all(requiredDynamicPackages.map(packageFiles))).flat();
+const withoutUnusedOptionalPackages = before.filter((file) => !isUnusedOptionalDependency(file));
+const after = [...new Set([
+  ...withoutUnusedOptionalPackages,
+  ...requiredDynamicFiles,
+])];
 const hasKordocRuntime = after.some((file) => normalized(file).includes("/node_modules/kordoc/"));
 if (!hasKordocRuntime) throw new Error("Kordoc 런타임이 Next trace에서 누락되었습니다.");
+for (const packageName of requiredDynamicPackages) {
+  if (!after.some((file) => normalized(file).includes(`/node_modules/${packageName}/`))) {
+    throw new Error(`Kordoc 필수 패키지 ${packageName}가 Next trace에서 누락되었습니다.`);
+  }
+}
 
 const bytes = await tracedBytes(after);
 const maxBytes = 200 * 1024 * 1024;
@@ -63,4 +88,4 @@ if (bytes > maxBytes) {
 }
 
 await writeFile(tracePath, JSON.stringify({ ...trace, files: after }));
-console.log(`Kordoc API trace: ${before.length - after.length}개 optional 파일 제외, ${(bytes / 1024 / 1024).toFixed(1)}MB`);
+console.log(`Kordoc API trace: ${before.length - withoutUnusedOptionalPackages.length}개 optional 파일 제외, 필수 동적 패키지 포함, ${(bytes / 1024 / 1024).toFixed(1)}MB`);

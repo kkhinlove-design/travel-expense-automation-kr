@@ -13,6 +13,13 @@ const nextConfig = {
       "./node_modules/sharp/**/*",
     ],
   },
+  outputFileTracingIncludes: {
+    "/api/travel/parse-hwpx": [
+      "./node_modules/cfb/**/*",
+      "./node_modules/adler-32/**/*",
+      "./node_modules/crc-32/**/*",
+    ],
+  },
   async headers() {
     return [{
       source: "/:path*",
