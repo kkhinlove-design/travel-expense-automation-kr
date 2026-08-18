@@ -9,6 +9,7 @@ import styles from "./admin.module.css";
 
 const MAX_BULK_USERS = 100;
 const MAX_FARE_ROWS = 500;
+const USERS_PER_PAGE = 20;
 
 async function edgeFunctionErrorCode(invokeError) {
   const response = invokeError?.context;
@@ -67,6 +68,7 @@ export default function AdminPage() {
   const [fareError, setFareError] = useState("");
   const [managedUsers, setManagedUsers] = useState([]);
   const [userSearch, setUserSearch] = useState("");
+  const [userPage, setUserPage] = useState(1);
   const [usersBusy, setUsersBusy] = useState(false);
   const [usersMessage, setUsersMessage] = useState("");
   const [usersError, setUsersError] = useState("");
@@ -86,6 +88,11 @@ export default function AdminPage() {
       else loadManagedUsers();
     });
   }, []);
+
+  useEffect(() => {
+    setUserPage(1);
+    cancelEditingUser();
+  }, [userSearch]);
 
   async function loadManagedUsers({ quiet = false } = {}) {
     setUsersBusy(true);
@@ -259,11 +266,14 @@ export default function AdminPage() {
   if (!allowed) return <main style={{ padding: 40 }}><p role="alert">{error}</p><a href="/signin">로그인 화면으로 이동</a></main>;
 
   const normalizedSearch = userSearch.trim().toLocaleLowerCase("ko-KR");
-  const visibleUsers = managedUsers.filter((user) =>
+  const filteredUsers = managedUsers.filter((user) =>
     !normalizedSearch
     || user.email.toLocaleLowerCase("ko-KR").includes(normalizedSearch)
     || user.fullName.toLocaleLowerCase("ko-KR").includes(normalizedSearch)
   );
+  const userPageCount = Math.max(1, Math.ceil(filteredUsers.length / USERS_PER_PAGE));
+  const currentUserPage = Math.min(userPage, userPageCount);
+  const visibleUsers = filteredUsers.slice((currentUserPage - 1) * USERS_PER_PAGE, currentUserPage * USERS_PER_PAGE);
 
   return (
     <main style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", gap: 20, padding: 24, background: "#f4f6fa" }}>
@@ -302,7 +312,7 @@ export default function AdminPage() {
             autoComplete="off"
           />
         </label>
-        <p className={styles.listSummary}>전체 {managedUsers.length}명 · 검색 결과 {visibleUsers.length}명</p>
+        <p className={styles.listSummary}>전체 {managedUsers.length}명 · 검색 결과 {filteredUsers.length}명 · {currentUserPage}/{userPageCount}쪽</p>
         {usersMessage ? <p className={styles.successMessage}>{usersMessage}</p> : null}
         {usersError ? <p role="alert" className={styles.errorMessage}>{usersError}</p> : null}
         {!usersBusy && !visibleUsers.length ? <p className={styles.emptyMessage}>조건에 맞는 직원 계정이 없습니다.</p> : null}
@@ -351,6 +361,13 @@ export default function AdminPage() {
             );
           })}
         </div>
+        {filteredUsers.length > USERS_PER_PAGE ? (
+          <nav className={styles.userPagination} aria-label="직원 계정 목록 페이지">
+            <button type="button" onClick={() => { cancelEditingUser(); setUserPage((page) => Math.max(1, page - 1)); }} disabled={currentUserPage <= 1 || editBusy}>이전</button>
+            <span>{currentUserPage} / {userPageCount}</span>
+            <button type="button" onClick={() => { cancelEditingUser(); setUserPage((page) => Math.min(userPageCount, page + 1)); }} disabled={currentUserPage >= userPageCount || editBusy}>다음</button>
+          </nav>
+        ) : null}
       </section>
       <section style={{ width: "min(100%, 720px)", boxSizing: "border-box", padding: 32, borderRadius: 18, background: "#fff", boxShadow: "0 14px 50px #1d2b4418" }}>
         <h2 style={{ margin: 0 }}>엑셀로 직원 일괄 등록</h2>

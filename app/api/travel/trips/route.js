@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
-import { calculateTripExpense, tripRouteValidationError } from "@/lib/travel-rules";
+import {
+  calculateTripExpense,
+  tripDateValidationError,
+  tripRequiredInformationValidationError,
+  tripRouteValidationError,
+} from "@/lib/travel-rules";
 import { getSupabaseUser } from "@/lib/supabase/server";
 
 const SOURCE_BUCKET = "travel-sources";
@@ -225,6 +230,9 @@ export async function POST(request) {
   } catch {
     return NextResponse.json({ error: "출장 데이터 형식이 올바르지 않습니다." }, { status: 400 });
   }
+  if (!trip || typeof trip !== "object" || Array.isArray(trip)) {
+    return NextResponse.json({ error: "출장 데이터 형식이 올바르지 않습니다." }, { status: 400 });
+  }
 
   const tripId = validTripId(trip.id);
   if (!tripId) return NextResponse.json({ error: "출장 문서 ID가 올바르지 않습니다." }, { status: 400 });
@@ -233,6 +241,12 @@ export async function POST(request) {
   if (!VALID_TRANSPORT_TYPES.has(trip.transportType)) {
     return NextResponse.json({ error: "교통수단을 대중교통, 개인차 또는 법인차 중에서 선택해 주세요." }, { status: 400 });
   }
+  const requiredInformationError = tripRequiredInformationValidationError(trip);
+  if (requiredInformationError) {
+    return NextResponse.json({ error: requiredInformationError }, { status: 400 });
+  }
+  const dateError = tripDateValidationError(trip.startAt, trip.endAt);
+  if (dateError) return NextResponse.json({ error: dateError }, { status: 400 });
 
   const outbound = validFare(trip.outboundTransportActual);
   const returning = validFare(trip.returnTransportActual);

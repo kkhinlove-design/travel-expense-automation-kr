@@ -27,6 +27,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "postbuild": "node scripts/prune-kordoc-trace.mjs",
     "start": "next start",
     "test": "node --test",
     "sync:pdf-worker": "node scripts/sync-pdf-worker.mjs",
@@ -37,6 +38,7 @@
     "@supabase/ssr": "0.12.4",
     "@supabase/supabase-js": "2.112.2",
     "jszip": "3.10.1",
+    "kordoc": "4.7.2",
     "next": "15.5.23",
     "pdfjs-dist": "4.10.38",
     "react": "19.2.6",
@@ -45,6 +47,7 @@
   },
   "overrides": {
     "adm-zip": "0.6.0",
+    "nanoid": "3.3.18",
     "postcss": "8.5.23",
     "sharp": "0.35.3"
   },

@@ -32,8 +32,8 @@ export default async function AccountPage() {
       initialDefaultOrigin={preference.defaultOrigin}
       reportApproverTitles={ORGANIZATION_CONFIG.reportApproverTitles}
       initialReportApprovalLine={preference.reportApprovalLine}
-      preferenceWritable={!localDevelopment}
-      preferenceLoadError={preference.error ? "저장된 기본 출발 사무소를 불러오지 못했습니다." : ""}
+      preferenceWritable={!localDevelopment && !preference.error}
+      preferenceLoadError={preference.error ? "저장된 출장 기본값을 불러오지 못했습니다. 새 값으로 덮어쓰지 않도록 저장을 잠시 막았습니다." : ""}
     />
   );
 }

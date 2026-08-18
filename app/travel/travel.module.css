@@ -339,6 +339,8 @@
 .reportPage .reportBodyDense p { margin-bottom: .7mm; }
 .reportPage .reportBodyExtraDense { padding: 3mm 2.5mm; font-size: 6.3pt; line-height: 1.12; }
 .reportPage .reportBodyExtraDense p { margin-bottom: .3mm; }
+.reportPage .reportBodyUltraDense { padding: 2mm; font-size: 5.3pt; line-height: 1.04; letter-spacing: -.015em; }
+.reportPage .reportBodyUltraDense p { margin-bottom: .1mm; }
 .reportPage .reportSign { padding: 3mm 0; font-size: 10pt; line-height: 1.45; }
 
 @media (max-width: 1050px) {

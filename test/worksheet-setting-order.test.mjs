@@ -18,6 +18,13 @@ test("puts printOptions before an existing pageMargins", () => {
   ]);
 });
 
+test("puts sheetPr first so fit-to-page metadata keeps the worksheet schema order", () => {
+  const sheet = ["dimension", "sheetViews", "sheetData", "pageMargins", "pageSetup"];
+  assert.deepEqual(insert(sheet, "sheetPr"), [
+    "sheetPr", "dimension", "sheetViews", "sheetData", "pageMargins", "pageSetup",
+  ]);
+});
+
 test("puts pageSetup after pageMargins but before the tail elements", () => {
   const sheet = ["sheetData", "mergeCells", "pageMargins", "legacyDrawing"];
   assert.deepEqual(insert(sheet, "pageSetup"), [

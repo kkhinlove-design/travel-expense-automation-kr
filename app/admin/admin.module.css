@@ -88,6 +88,35 @@
   margin-top: 12px;
 }
 
+.userPagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.userPagination button {
+  min-width: 76px;
+  min-height: 44px;
+  border: 1px solid #b9c7dc;
+  border-radius: 8px;
+  background: #f5f8fc;
+  color: #214b8e;
+  font: inherit;
+  font-weight: 700;
+}
+
+.userPagination button:disabled {
+  opacity: .48;
+}
+
+.userPagination span {
+  color: #475467;
+  font-size: 14px;
+  font-weight: 700;
+}
+
 .userCard {
   padding: 18px;
   border: 1px solid #e4e7ec;

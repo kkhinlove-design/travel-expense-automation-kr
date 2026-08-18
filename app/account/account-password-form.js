@@ -144,7 +144,7 @@ export default function AccountPasswordForm({
             <div style={{ marginTop: 16 }}>
               <button type="submit" disabled={!preferenceWritable || preferenceBusy} style={{ width: "100%", minHeight: 46, padding: "0 18px", border: 0, borderRadius: 8, background: "#214b8e", color: "#fff", fontWeight: 700 }}>{preferenceBusy ? "저장 중…" : "출장 기본값 저장"}</button>
             </div>
-            {!preferenceWritable ? <p style={{ margin: "12px 0 0", color: "#667085", fontSize: 13, lineHeight: 1.6 }}>로컬 미리보기에서는 저장되지 않습니다. 로그인한 운영 사이트에서 설정해 주세요.</p> : null}
+            {!preferenceWritable ? <p style={{ margin: "12px 0 0", color: "#667085", fontSize: 13, lineHeight: 1.6 }}>{preferenceLoadError ? "저장된 값을 다시 불러온 뒤 수정해 주세요." : "로컬 미리보기에서는 저장되지 않습니다. 로그인한 운영 사이트에서 설정해 주세요."}</p> : null}
             {preferenceMessage ? <p role="status" style={{ margin: "12px 0 0", color: "#16704f", lineHeight: 1.6 }}>{preferenceMessage}</p> : null}
             {preferenceError ? <p role="alert" style={{ margin: "12px 0 0", color: "#b42318", lineHeight: 1.6 }}>{preferenceError}</p> : null}
           </form>

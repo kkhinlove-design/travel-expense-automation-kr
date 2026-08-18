@@ -13,6 +13,7 @@ function invalid(p, row = "") {
 }
 function output(row, scope = "personal") { return { id: row.id, origin: row.origin, destination: row.destination, outbound_fare: row.outbound_fare, return_fare: row.return_fare, updated_at: row.updated_at, scope }; }
 function routeKey(origin, destination) { return `${String(origin || "").toLocaleLowerCase("ko-KR")}\u0000${String(destination || "").toLocaleLowerCase("ko-KR")}`; }
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export async function GET() {
   const { client, user } = await getSupabaseUser();
@@ -47,11 +48,31 @@ export async function POST(request) {
     }
     seenInBatch.add(key);
   }
-  const { data: existing, error: listError } = await client.from("travel_fare_presets").select("id,origin,destination,created_at").order("updated_at", { ascending: false }).limit(100);
+  const { data: existing, error: listError } = await client.from("travel_fare_presets").select("id,origin,destination,created_at").eq("user_id", user.id).order("updated_at", { ascending: false }).limit(100);
   if (listError) return NextResponse.json({ error: "기존 운임 설정을 확인하지 못했습니다." }, { status: 500 });
-  const byRoute = new Map((existing || []).map((row) => [`${row.origin.toLocaleLowerCase("ko-KR")}\u0000${row.destination.toLocaleLowerCase("ko-KR")}`, row]));
-  const rows = presets.map((p) => { const old = byRoute.get(`${p.origin.toLocaleLowerCase("ko-KR")}\u0000${p.destination.toLocaleLowerCase("ko-KR")}`); return { id: old?.id || crypto.randomUUID(), user_id: user.id, origin: p.origin, destination: p.destination, outbound_fare: p.outboundFare, return_fare: p.returnFare, created_at: old?.created_at || new Date().toISOString(), updated_at: new Date().toISOString() }; });
-  const created = rows.filter((row) => !byRoute.has(`${row.origin.toLocaleLowerCase("ko-KR")}\u0000${row.destination.toLocaleLowerCase("ko-KR")}`)).length;
+  const byRoute = new Map((existing || []).map((row) => [routeKey(row.origin, row.destination), row]));
+  const byId = new Map((existing || []).map((row) => [row.id, row]));
+  const matchedRows = [];
+  for (const preset of presets) {
+    if (preset.id && !UUID_PATTERN.test(preset.id)) {
+      return NextResponse.json({ error: "수정할 운임 ID 형식이 올바르지 않습니다." }, { status: 400 });
+    }
+    const oldById = preset.id ? byId.get(preset.id) : null;
+    if (preset.id && !oldById) {
+      return NextResponse.json({ error: "수정할 운임 설정을 찾지 못했습니다." }, { status: 404 });
+    }
+    const oldByRoute = byRoute.get(routeKey(preset.origin, preset.destination));
+    if (oldById && oldByRoute && oldByRoute.id !== oldById.id) {
+      return NextResponse.json({ error: "같은 출발지·도착지 운임이 이미 저장되어 있습니다." }, { status: 409 });
+    }
+    matchedRows.push(oldById || oldByRoute || null);
+  }
+  const now = new Date().toISOString();
+  const rows = presets.map((p, index) => {
+    const old = matchedRows[index];
+    return { id: old?.id || crypto.randomUUID(), user_id: user.id, origin: p.origin, destination: p.destination, outbound_fare: p.outboundFare, return_fare: p.returnFare, created_at: old?.created_at || now, updated_at: now };
+  });
+  const created = matchedRows.filter((row) => !row).length;
   if ((existing?.length || 0) + created > 100) return NextResponse.json({ error: "대중교통 운임 설정은 계정당 최대 100개까지 저장할 수 있습니다." }, { status: 400 });
   const { data, error } = await client.from("travel_fare_presets").upsert(rows, { onConflict: "id" }).select("id,origin,destination,outbound_fare,return_fare,updated_at");
   if (error) return NextResponse.json({ error: "대중교통 운임을 저장하지 못했습니다." }, { status: 500 });

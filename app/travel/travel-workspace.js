@@ -5,6 +5,7 @@ import { LOCAL_AI_CONFIG } from "@/config/local-ai";
 import { APP_FOOTER, ORGANIZATION_CONFIG } from "@/config/organization";
 import { TRAVEL_POLICY } from "@/config/travel-policy";
 import { buildTravelWorkbook, travelWorkbookFilename } from "@/lib/travel-excel";
+import { findAutomaticFareMatch } from "@/lib/travel-fare-matching";
 import { extractApprovedTravelHwpx, extractApprovedTravelPdf } from "@/lib/travel-parser";
 import {
   buildRuleBasedTravelReport,
@@ -23,6 +24,8 @@ import {
   PROJECT_TYPES,
   TRANSPORT_TYPES,
   tripAmountIssues,
+  tripDateValidationError,
+  tripRequiredInformationValidationError,
   tripRoutePoints,
   tripRouteValidationError,
   tripTransportFares,
@@ -35,6 +38,8 @@ const CHUNK_RELOAD_KEY = "travel:chunk-reload-at";
 const CHUNK_RELOAD_COOLDOWN_MS = 60_000;
 const MAX_FARE = 10_000_000;
 const MAX_SOURCE_FILE_SIZE = 4 * 1024 * 1024;
+const MAX_REPORT_CHARACTERS = 3_200;
+const MAX_REPORT_VISUAL_LINES = 60;
 
 function fareValue(value) {
   const numeric = Number(value);
@@ -202,31 +207,6 @@ function farePresetDraft(preset = {}) {
   };
 }
 
-function fareRouteWords(value) {
-  const cleaned = String(value || "")
-    .replace(/[()]/g, " ")
-    .replace(/전라북도|전북특별자치도|전북|특별자치도|특별시|광역시/g, " ")
-    .replace(/(?:시외|고속)?버스터미널|여객터미널|터미널|기차역|철도역|역(?=\s|$)/g, " ")
-    .toLocaleLowerCase("ko-KR");
-  return cleaned.split(/[^0-9a-z가-힣]+/i).map((word) => word.trim()).filter((word) => word.length >= 2);
-}
-
-function fareLocationMatches(left, right) {
-  const leftWords = fareRouteWords(left);
-  const rightWords = fareRouteWords(right);
-  return leftWords.some((leftWord) => rightWords.some((rightWord) => (
-    leftWord === rightWord || leftWord.includes(rightWord) || rightWord.includes(leftWord)
-  )));
-}
-
-function findAutomaticFarePreset(trip, presets) {
-  if (!["personal", "public"].includes(trip.transportType) || trip.tripScope === "local") return null;
-  if (!fareRouteWords(trip.origin).length || !fareRouteWords(trip.destination).length) return null;
-  return presets.find((preset) => (
-    fareLocationMatches(trip.origin, preset.origin) && fareLocationMatches(trip.destination, preset.destination)
-  )) || null;
-}
-
 function tripWithFarePreset(current, item) {
   const outbound = fareValue(item.outbound_fare ?? item.outboundFare);
   const returning = fareValue(item.return_fare ?? item.returnFare);
@@ -301,6 +281,24 @@ function money(value) {
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return UNREADABLE_AMOUNT;
   return `${KRW.format(Math.round(numeric))}원`;
+}
+
+function reportLayoutMetrics(content) {
+  const lines = String(content || "").split(/\r?\n/);
+  const visualLines = lines.reduce((total, line) => total + Math.max(1, Math.ceil([...line].length / 62)), 0);
+  return {
+    characters: [...String(content || "")].length,
+    visualLines,
+  };
+}
+
+function reportDocumentError(trip) {
+  const content = String(trip?.reportContent || buildRuleBasedTravelReport(trip));
+  const metrics = reportLayoutMetrics(content);
+  if (metrics.characters > MAX_REPORT_CHARACTERS || metrics.visualLines > MAX_REPORT_VISUAL_LINES) {
+    return `출장내용이 A4 한 쪽 범위를 넘습니다. ${MAX_REPORT_CHARACTERS.toLocaleString("ko-KR")}자·약 ${MAX_REPORT_VISUAL_LINES}줄 이내로 줄여 주세요.`;
+  }
+  return "";
 }
 
 function reportBasisKey(trip) {
@@ -499,8 +497,16 @@ function ExpenseStatement({ trip, items, expense, transportLabel }) {
 function PrintBundle({ trip, expense }) {
   const transportLabel = trip.transportType === "corporate" ? "법인차" : trip.transportType === "personal" ? "개인차" : "대중교통";
   const reportLines = String(trip.reportContent || buildRuleBasedTravelReport(trip)).split(/\r?\n/);
-  const reportLength = reportLines.join("").length;
-  const reportDensityClass = reportLength > 1800 ? styles.reportBodyExtraDense : reportLength > 1100 ? styles.reportBodyDense : reportLength > 650 ? styles.reportBodyCompact : "";
+  const reportMetrics = reportLayoutMetrics(reportLines.join("\n"));
+  const reportDensityClass = reportMetrics.characters > 2_400 || reportMetrics.visualLines > 42
+    ? styles.reportBodyUltraDense
+    : reportMetrics.characters > 1_600 || reportMetrics.visualLines > 32
+      ? styles.reportBodyExtraDense
+      : reportMetrics.characters > 1_000 || reportMetrics.visualLines > 24
+        ? styles.reportBodyDense
+        : reportMetrics.characters > 600 || reportMetrics.visualLines > 16
+          ? styles.reportBodyCompact
+          : "";
   const today = new Date().toISOString().slice(0, 10);
   const participantExpenses = expense.participantExpenses ?? [];
   const expenseGroups = [];
@@ -537,7 +543,7 @@ export default function TravelWorkspace({ user, defaultOrigin, defaultReportAppr
   const [sourceMismatch, setSourceMismatch] = useState("");
   const [recentTrips, setRecentTrips] = useState([]);
   const [farePresets, setFarePresets] = useState([]);
-  const [farePreset, setFarePreset] = useState(() => farePresetDraft());
+  const [farePreset, setFarePreset] = useState(() => farePresetDraft({ origin: defaultOrigin }));
   const [farePresetLoading, setFarePresetLoading] = useState(true);
   const [farePresetLoadError, setFarePresetLoadError] = useState("");
   const [fareOptions, setFareOptions] = useState([]);
@@ -560,13 +566,25 @@ export default function TravelWorkspace({ user, defaultOrigin, defaultReportAppr
   const hasSourceDocument = Boolean(approvedPdfFile || sourceHwpxFile);
 
   useEffect(() => {
+    setFarePreset((current) => current.id ? current : {
+      ...current,
+      origin: trip.origin || defaultOrigin || "",
+    });
+  }, [trip.origin, defaultOrigin]);
+
+  useEffect(() => {
     const hasFareSource = Boolean(trip.fareSource || trip.fareSources?.outbound || trip.fareSources?.return);
     if (!farePresets.length
       || hasFareSource
       || tripTransportFares(trip).total
       || normalizeTripWaypoints(trip).length) return;
 
-    const automaticPreset = findAutomaticFarePreset(trip, farePresets);
+    const automaticMatch = findAutomaticFareMatch(trip, farePresets);
+    if (automaticMatch.ambiguous && !automaticMatch.preset) {
+      setNotice(`출발지·출장지 단어에 맞는 운임이 ${automaticMatch.candidates.length}개이고 금액이 서로 다릅니다. 운임 설정에서 맞는 노선을 직접 적용해 주세요.`);
+      return;
+    }
+    const automaticPreset = automaticMatch.preset;
     if (!automaticPreset) return;
 
     setTrip((current) => {
@@ -574,9 +592,9 @@ export default function TravelWorkspace({ user, defaultOrigin, defaultReportAppr
       if (currentHasFareSource
         || tripTransportFares(current).total
         || normalizeTripWaypoints(current).length) return current;
-      const currentPreset = findAutomaticFarePreset(current, farePresets);
-      if (!currentPreset) return current;
-      return updateReportForBasisChange(current, tripWithFarePreset(current, currentPreset));
+      const currentMatch = findAutomaticFareMatch(current, farePresets);
+      if (!currentMatch.preset) return current;
+      return updateReportForBasisChange(current, tripWithFarePreset(current, currentMatch.preset));
     });
     setNotice(`저장 운임 ${automaticPreset.origin} → ${automaticPreset.destination} 왕복 ${money(fareValue(automaticPreset.outbound_fare ?? automaticPreset.outboundFare) + fareValue(automaticPreset.return_fare ?? automaticPreset.returnFare))}을 자동 적용했습니다.`);
   }, [farePresets, trip.id, trip.origin, trip.destination, trip.transportDestination, trip.transportType, trip.tripScope, trip.waypoints, trip.outboundTransportActual, trip.returnTransportActual, trip.fareSource, trip.fareSources]);
@@ -586,8 +604,7 @@ export default function TravelWorkspace({ user, defaultOrigin, defaultReportAppr
       setFareOptions([]);
       setFareNotice("");
       if (trip[key] !== value && tripTransportFares(trip).total) {
-        const routeBasisChanged = ["origin", "transportDestination", "transportType", "tripScope"].includes(key)
-          || (key === "destination" && !String(trip.transportDestination || "").trim());
+        const routeBasisChanged = ["origin", "transportDestination", "destination", "transportType", "tripScope"].includes(key);
         const dateChanged = ["startAt", "endAt"].includes(key);
         const fareSources = [
           ...Object.values(trip.fareSources ?? {}),
@@ -600,8 +617,7 @@ export default function TravelWorkspace({ user, defaultOrigin, defaultReportAppr
     }
     setTrip((current) => {
       const changed = current[key] !== value;
-      const routeBasisChanged = changed && (["origin", "transportDestination", "transportType", "tripScope"].includes(key)
-        || (key === "destination" && !String(current.transportDestination || "").trim()));
+      const routeBasisChanged = changed && ["origin", "transportDestination", "destination", "transportType", "tripScope"].includes(key);
       const dateChanged = changed && ["startAt", "endAt"].includes(key);
       const fareSources = [
         ...Object.values(current.fareSources ?? {}),
@@ -612,6 +628,7 @@ export default function TravelWorkspace({ user, defaultOrigin, defaultReportAppr
       const next = {
         ...current,
         [key]: value,
+        ...(key === "destination" ? { transportDestination: value } : {}),
         ...(key === "purpose" ? {
           participants: current.participants.map((participant) => ({ ...participant, purpose: value })),
         } : {}),
@@ -637,8 +654,11 @@ export default function TravelWorkspace({ user, defaultOrigin, defaultReportAppr
   }
 
   function openExpenseSection() {
-    if (!String(trip.origin || "").trim()) {
-      setNotice("실제 출장 출발 사무소를 선택해 주세요.");
+    const informationError = tripRequiredInformationValidationError(trip)
+      || tripDateValidationError(trip.startAt, trip.endAt)
+      || (!String(trip.origin || "").trim() ? "실제 출장 출발 사무소를 선택해 주세요." : "");
+    if (informationError) {
+      setNotice(informationError);
       setActiveSection("review");
       return;
     }
@@ -646,8 +666,11 @@ export default function TravelWorkspace({ user, defaultOrigin, defaultReportAppr
   }
 
   function openReportSection() {
-    if (!String(trip.origin || "").trim()) {
-      setNotice("복명서 작성 전에 실제 출장 출발 사무소를 선택해 주세요.");
+    const informationError = tripRequiredInformationValidationError(trip)
+      || tripDateValidationError(trip.startAt, trip.endAt)
+      || (!String(trip.origin || "").trim() ? "복명서 작성 전에 실제 출장 출발 사무소를 선택해 주세요." : "");
+    if (informationError) {
+      setNotice(informationError);
       setActiveSection("review");
       return;
     }
@@ -693,8 +716,11 @@ export default function TravelWorkspace({ user, defaultOrigin, defaultReportAppr
     // 0원으로 채운 신청서가 그대로 결재에 올라가는 일을 막는다.
     const amountIssue = tripAmountIssues(trip)[0];
     return sourceMismatch
+      || tripRequiredInformationValidationError(trip)
+      || tripDateValidationError(trip.startAt, trip.endAt)
       || amountIssue
       || tripRouteValidationError(trip)
+      || reportDocumentError(trip)
       || (trip.reportNeedsReview ? "출장 정보가 바뀌었습니다. 복명 내용을 다시 작성하거나 확인 완료해 주세요." : "");
   }
 
@@ -881,8 +907,7 @@ export default function TravelWorkspace({ user, defaultOrigin, defaultReportAppr
       setNotice("새 버전으로 자동 갱신했습니다. 출장신청 PDF 또는 HWPX를 다시 선택해 주세요.");
     }
 
-    const handlePreloadError = (event) => {
-      event.preventDefault();
+    const recoverFromChunkError = () => {
       const lastReload = Number(window.sessionStorage.getItem(CHUNK_RELOAD_KEY) || 0);
       if (Date.now() - lastReload < CHUNK_RELOAD_COOLDOWN_MS) {
         setNotice("새 버전 파일을 불러오지 못했습니다. 잠시 후 페이지를 새로고침해 주세요.");
@@ -891,14 +916,29 @@ export default function TravelWorkspace({ user, defaultOrigin, defaultReportAppr
       window.sessionStorage.setItem(CHUNK_RELOAD_KEY, String(Date.now()));
       window.location.reload();
     };
-    window.addEventListener("vite:preloadError", handlePreloadError);
+    const isChunkLoadError = (value) => /ChunkLoadError|Loading chunk .* failed|Failed to fetch dynamically imported module|Importing a module script failed/i.test(String(value || ""));
+    const handleWindowError = (event) => {
+      if (!isChunkLoadError(event?.message || event?.error?.message)) return;
+      event.preventDefault();
+      recoverFromChunkError();
+    };
+    const handleUnhandledRejection = (event) => {
+      if (!isChunkLoadError(event?.reason?.message || event?.reason)) return;
+      event.preventDefault();
+      recoverFromChunkError();
+    };
+    window.addEventListener("error", handleWindowError);
+    window.addEventListener("unhandledrejection", handleUnhandledRejection);
 
     fetch("/api/travel/trips")
       .then((response) => response.ok ? response.json() : { trips: [] })
       .then((data) => setRecentTrips(data.trips ?? []))
       .catch(() => setRecentTrips([]));
     loadFarePresets();
-    return () => window.removeEventListener("vite:preloadError", handlePreloadError);
+    return () => {
+      window.removeEventListener("error", handleWindowError);
+      window.removeEventListener("unhandledrejection", handleUnhandledRejection);
+    };
   }, []);
 
   async function draftReport() {
@@ -990,7 +1030,8 @@ export default function TravelWorkspace({ user, defaultOrigin, defaultReportAppr
       mealsProvided: parsedParticipants[0].mealsProvided,
       reportNotes: "",
     };
-    const automaticPreset = findAutomaticFarePreset(nextTrip, availablePresets);
+    const automaticMatch = findAutomaticFareMatch(nextTrip, availablePresets);
+    const automaticPreset = automaticMatch.preset;
     if (automaticPreset) {
       const appliedTrip = tripWithFarePreset(nextTrip, automaticPreset);
       nextTrip = {
@@ -1011,8 +1052,10 @@ export default function TravelWorkspace({ user, defaultOrigin, defaultReportAppr
     const participantNotice = parsed.participants?.length > 1 ? ` 출장자 ${parsed.participants.length}명을 분리했습니다.` : "";
     const fareNoticeText = !nextTrip.origin
       ? " 실제 출장 출발 사무소를 선택하면 저장 운임을 자동 적용합니다."
-      : automaticPreset
-        ? ` 저장 운임 ${automaticPreset.origin} → ${automaticPreset.destination} 왕복 ${money(tripTransportFares(nextTrip).total)}을 자동 적용했습니다.`
+        : automaticPreset
+          ? ` 저장 운임 ${automaticPreset.origin} → ${automaticPreset.destination} 왕복 ${money(tripTransportFares(nextTrip).total)}을 자동 적용했습니다.`
+          : automaticMatch.ambiguous
+            ? ` 같은 지역 단어에 금액이 다른 운임 ${automaticMatch.candidates.length}개가 있어 자동 적용하지 않았습니다. 운임 설정에서 맞는 노선을 선택해 주세요.`
         : parsed.transportType === "corporate"
           ? " 법인차는 대중교통 운임 대신 통행료·주차비를 직접 확인해 주세요."
           : " 일치하는 저장 운임이 없어 여비계산에서 금액을 확인해 주세요.";
@@ -1263,7 +1306,7 @@ export default function TravelWorkspace({ user, defaultOrigin, defaultReportAppr
       if (!response.ok) throw new Error(data.error || "대중교통 운임을 저장하지 못했습니다.");
       setFarePresets((current) => [data.preset, ...current.filter((item) => item.id !== data.preset.id)]);
       setFarePresetLoadError("");
-      setFarePreset(farePresetDraft());
+      setFarePreset(farePresetDraft({ origin: trip.origin || defaultOrigin }));
       setNotice(`${data.preset.origin} → ${data.preset.destination} 대중교통 운임을 내 설정에 저장했습니다.`);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "대중교통 운임을 저장하지 못했습니다.");
@@ -1315,7 +1358,7 @@ export default function TravelWorkspace({ user, defaultOrigin, defaultReportAppr
       const data = await response.json().catch(() => ({}));
       if (!response.ok && response.status !== 404) throw new Error(data.error || "대중교통 운임을 삭제하지 못했습니다.");
       setFarePresets((current) => current.filter((preset) => preset.id !== item.id));
-      if (farePreset.id === item.id) setFarePreset(farePresetDraft());
+      if (farePreset.id === item.id) setFarePreset(farePresetDraft({ origin: trip.origin || defaultOrigin }));
       setNotice(response.status === 404 ? "이미 삭제된 운임 설정을 목록에서 정리했습니다." : "대중교통 운임 설정을 삭제했습니다.");
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "대중교통 운임을 삭제하지 못했습니다.");
@@ -1483,6 +1526,7 @@ export default function TravelWorkspace({ user, defaultOrigin, defaultReportAppr
     setFareOptions([]);
     setFareDirection("outbound");
     setFareNotice("");
+    setFarePreset(farePresetDraft({ origin: defaultOrigin }));
     setAiProgress({ progress: 0, text: "" });
     setNotice(defaultOrigin
       ? `새 출장의 기본 출발지를 ${defaultOrigin} 사무소로 적용했습니다.`
@@ -1527,7 +1571,7 @@ export default function TravelWorkspace({ user, defaultOrigin, defaultReportAppr
               <button type="button" onClick={() => hwpxInputRef.current?.click()} disabled={Boolean(busy)}>{sourceHwpxFile ? "HWPX 교체" : "HWPX 선택"}</button>
             </article>
           </div>
-          <p className={styles.uploadHint}>{busy === "parse" ? "문서를 읽는 중입니다…" : "PDF 또는 HWPX만 올려도 사용할 수 있으며, 두 원본의 합계는 최대 4MB입니다."}</p>
+          <p className={styles.uploadHint}>{busy === "parse" ? "문서를 읽는 중입니다…" : "PDF는 브라우저에서, HWPX는 정확도를 높이기 위해 로그인한 앱 서버의 Kordoc에서도 일시 분석합니다. 저장 전에는 원본을 보관하지 않으며 두 파일 합계는 최대 4MB입니다."}</p>
         </div>
       </section>
 
@@ -1556,7 +1600,7 @@ export default function TravelWorkspace({ user, defaultOrigin, defaultReportAppr
                 <Field label="문서제목"><input value={trip.documentTitle} onChange={(event) => update("documentTitle", event.target.value)} placeholder="출장신청_날짜_성명" /></Field>
                 <Field label="출장 구분"><select value={trip.tripScope} onChange={(event) => update("tripScope", event.target.value)}><option value="domestic">국내 출장</option><option value="local">근무지내 출장</option></select></Field>
                 <Field label="출장목적" wide><input value={trip.purpose} onChange={(event) => update("purpose", event.target.value)} placeholder="구체적인 출장 목적" /></Field>
-                <Field label="출장지(방문기관)" wide><input value={trip.destination} onChange={(event) => update("destination", event.target.value)} placeholder="예: 전북 남원 (남원시 웹단)" /></Field>
+                <Field label="출장지(방문기관)" wide hint="교통 도착지도 같은 값으로 작성되며 운임 기준표의 터미널명은 제출 서류에 표시하지 않습니다."><input value={trip.destination} onChange={(event) => update("destination", event.target.value)} placeholder="예: 전북 남원 (남원시 웹단)" /></Field>
                 <div className={`${styles.fieldWide} ${styles.waypointField}`}>
                   <div className={styles.waypointHeader}><div><span>경유지</span><small>가는 길 순서대로 추가하면 오는 길에는 역순으로 반영됩니다.</small></div><button type="button" onClick={addWaypoint}>+ 경유지 추가</button></div>
                   {trip.waypoints?.length ? <div className={styles.waypointList}>{trip.waypoints.map((waypoint, index) => <div key={waypoint.id}><b>{index + 1}</b><input value={waypoint.name} onChange={(event) => updateWaypoint(waypoint.id, event.target.value)} placeholder="예: 익산터미널" /><button type="button" onClick={() => removeWaypoint(waypoint.id)} aria-label={`경유지 ${index + 1} 삭제`}>삭제</button></div>)}</div> : <p className={styles.waypointEmpty}>경유지가 없으면 추가하지 않아도 됩니다.</p>}
@@ -1570,7 +1614,6 @@ export default function TravelWorkspace({ user, defaultOrigin, defaultReportAppr
                     {trip.origin && !ORGANIZATION_CONFIG.originBases.includes(trip.origin) ? <option value={trip.origin}>{trip.origin} (기존 저장값)</option> : null}
                   </select>
                 </Field>
-                <Field label="교통 도착지" hint="미입력 시 출장지(방문기관)와 동일하게 작성됩니다."><input value={trip.transportDestination || ""} onChange={(event) => update("transportDestination", event.target.value)} placeholder="예: 남원시외버스터미널" /></Field>
                 <Field label="교통수단"><select value={trip.transportType} onChange={(event) => update("transportType", event.target.value)}>{TRANSPORT_TYPES.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></Field>
               </div>
               <section className={styles.participantSection} aria-labelledby="participant-heading">
@@ -1680,7 +1723,7 @@ export default function TravelWorkspace({ user, defaultOrigin, defaultReportAppr
                 </div>
               </section>
               {trip.reportNeedsReview ? <div className={styles.reportReviewWarning}><span>출장 경로·일시·방문기관 등 복명서의 기준 정보가 바뀌었습니다. AI 초안을 다시 만들거나 기존 내용을 확인해 주세요.</span><button type="button" onClick={confirmReportReview}>내용 확인 완료</button></div> : null}
-              <Field label="출장내용" wide hint="AI 초안을 검토·수정하세요. 줄바꿈을 유지해 출장복명서와 Excel에 반영합니다."><textarea rows="10" value={trip.reportContent} onChange={(event) => updateReportContent(event.target.value)} /></Field>
+              <Field label="출장내용" wide hint={`AI 초안을 검토·수정하세요. A4 한 쪽에 맞춰 자동 축소하며 현재 ${reportLayoutMetrics(trip.reportContent).characters.toLocaleString("ko-KR")} / ${MAX_REPORT_CHARACTERS.toLocaleString("ko-KR")}자입니다.`}><textarea rows="10" maxLength={MAX_REPORT_CHARACTERS} value={trip.reportContent} onChange={(event) => updateReportContent(event.target.value)} /></Field>
               <div className={styles.reportApprovalNotice}><span>복명서 결재라인</span><strong>{reportApprovalLineForDocument(trip.reportApprovalLine).join(" → ")}</strong><a href="/account">환경 설정에서 변경</a></div>
               <div className={styles.documentPreview}>
                 <div><span>01</span><strong>여비지급신청서</strong><small>출장자별 {trip.participants.length}부</small></div>
@@ -1710,7 +1753,7 @@ export default function TravelWorkspace({ user, defaultOrigin, defaultReportAppr
                 <Field label="도착지"><input value={farePreset.destination} onChange={(event) => updateFarePresetDraft("destination", event.target.value)} placeholder="예: 남원시외버스터미널" /></Field>
                 <Field label="가는 길 운임"><input type="number" min="0" max="10000000" step="100" value={farePreset.outboundFare} onFocus={selectZeroNumber} onClick={selectZeroNumber} onChange={(event) => updateFarePresetDraft("outboundFare", event.target.value)} /></Field>
                 <Field label="오는 길 운임"><input type="number" min="0" max="10000000" step="100" value={farePreset.returnFare} onFocus={selectZeroNumber} onClick={selectZeroNumber} onChange={(event) => updateFarePresetDraft("returnFare", event.target.value)} /></Field>
-                <div className={styles.farePresetFormActions}>{farePreset.id ? <button type="button" className={styles.secondaryButton} onClick={() => setFarePreset(farePresetDraft())} disabled={Boolean(busy)}>수정 취소</button> : null}<button type="button" className={styles.primaryButton} onClick={saveFarePreset} disabled={Boolean(busy)}>{busy === "fare-preset-save" ? "저장 중…" : farePreset.id ? "운임 수정" : "운임 저장"}</button></div>
+                <div className={styles.farePresetFormActions}>{farePreset.id ? <button type="button" className={styles.secondaryButton} onClick={() => setFarePreset(farePresetDraft({ origin: trip.origin || defaultOrigin }))} disabled={Boolean(busy)}>수정 취소</button> : null}<button type="button" className={styles.primaryButton} onClick={saveFarePreset} disabled={Boolean(busy)}>{busy === "fare-preset-save" ? "저장 중…" : farePreset.id ? "운임 수정" : "운임 저장"}</button></div>
               </div>
               <p className={styles.farePresetGuide}>관리자가 등록한 공용 기준표가 같은 노선의 개인 설정보다 항상 먼저 적용됩니다. 공용 기준표가 없는 노선만 내 계정의 보조 운임을 사용합니다. 법인차와 근무지내 출장에는 적용할 수 없습니다.</p>
               {farePresetLoadError ? <div className={styles.farePresetLoadError}><span>{farePresetLoadError}</span><button type="button" onClick={() => loadFarePresets({ notify: true })} disabled={farePresetLoading}>다시 불러오기</button></div> : null}
