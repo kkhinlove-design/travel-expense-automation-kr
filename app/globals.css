@@ -71,6 +71,14 @@ button:disabled {
   .account-preference-actions button {
     width: 100%;
   }
+
+  .account-approval-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .account-approval-grid > span {
+    display: none;
+  }
 }
 
 a {

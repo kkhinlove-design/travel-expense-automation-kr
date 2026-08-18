@@ -27,7 +27,7 @@ import {
   tripRouteValidationError,
   tripTransportFares,
 } from "@/lib/travel-rules";
-import { initialTripOrigin } from "@/lib/travel-user-preferences";
+import { initialReportApprovalLine, initialTripOrigin, reportApprovalLineForDocument } from "@/lib/travel-user-preferences";
 import styles from "./travel.module.css";
 
 const KRW = new Intl.NumberFormat("ko-KR", { maximumFractionDigits: 0 });
@@ -147,7 +147,7 @@ function newParticipant(values = {}) {
   };
 }
 
-function blankTrip(user, defaultOrigin = "") {
+function blankTrip(user, defaultOrigin = "", defaultReportApprovalLine = ORGANIZATION_CONFIG.defaultReportApprovalLine) {
   const participant = newParticipant({
     employeeName: user?.displayName?.includes("@") ? "" : user?.displayName ?? "",
     transportClaimant: true,
@@ -186,6 +186,7 @@ function blankTrip(user, defaultOrigin = "") {
     reportContentSource: "empty",
     reportBasisKey: "",
     reportNeedsReview: false,
+    reportApprovalLine: initialReportApprovalLine(defaultReportApprovalLine),
     parsedText: "",
     missing: [],
   };
@@ -506,13 +507,14 @@ function PrintBundle({ trip, expense }) {
   for (let index = 0; index < participantExpenses.length; index += 5) expenseGroups.push(participantExpenses.slice(index, index + 5));
   const reporter = participantExpenses.find((item) => item.participant.id === trip.reporterParticipantId)?.participant ?? participantExpenses[0]?.participant;
   const travelerNames = participantExpenses.map((item) => item.participant.employeeName).filter(Boolean).join(", ");
+  const reportApprovalLine = reportApprovalLineForDocument(trip.reportApprovalLine);
   return (
     <section className={styles.printBundle} aria-hidden="true">
       {participantExpenses.map((item) => <ParticipantApplication key={item.participant.id} trip={trip} item={item} transportLabel={transportLabel} today={today} />)}
       {expenseGroups.map((items, index) => <ExpenseStatement key={`expense-${index}`} trip={trip} items={items} expense={expense} transportLabel={transportLabel} />)}
       <article className={`${styles.a4Portrait} ${styles.reportPage}`}>
         <h1>출장복명서</h1>
-        <div className={styles.approvalBox}><span>결재</span><div>실장</div><div>원장</div><span /><div /><div /></div>
+        <div className={styles.approvalBox}><span>결재</span><div>{reportApprovalLine[0]}</div><div>{reportApprovalLine[1]}</div><span /><div /><div /></div>
         <table className={`${styles.formTable} ${styles.reportTable}`}><tbody>
           <tr><th>출장자</th><td>{travelerNames}</td></tr>
           <tr><th>일시</th><td>{dateKorean(trip.startAt)} ({weekday(trip.startAt)}) {timeOnly(trip.startAt)}~{timeOnly(trip.endAt)}</td></tr>
@@ -526,8 +528,8 @@ function PrintBundle({ trip, expense }) {
   );
 }
 
-export default function TravelWorkspace({ user, defaultOrigin, signOutPath }) {
-  const [trip, setTrip] = useState(() => blankTrip(user, defaultOrigin));
+export default function TravelWorkspace({ user, defaultOrigin, defaultReportApprovalLine, signOutPath }) {
+  const [trip, setTrip] = useState(() => blankTrip(user, defaultOrigin, defaultReportApprovalLine));
   const [approvedPdfFile, setApprovedPdfFile] = useState(null);
   const [sourceHwpxFile, setSourceHwpxFile] = useState(null);
   const [approvedPdfPending, setApprovedPdfPending] = useState(false);
@@ -1470,7 +1472,7 @@ export default function TravelWorkspace({ user, defaultOrigin, signOutPath }) {
   function resetTrip() {
     parseRequestRef.current += 1;
     setBusy("");
-    setTrip(blankTrip(user, defaultOrigin));
+    setTrip(blankTrip(user, defaultOrigin, defaultReportApprovalLine));
     setApprovedPdfFile(null);
     setSourceHwpxFile(null);
     setApprovedPdfPending(false);
@@ -1679,6 +1681,7 @@ export default function TravelWorkspace({ user, defaultOrigin, signOutPath }) {
               </section>
               {trip.reportNeedsReview ? <div className={styles.reportReviewWarning}><span>출장 경로·일시·방문기관 등 복명서의 기준 정보가 바뀌었습니다. AI 초안을 다시 만들거나 기존 내용을 확인해 주세요.</span><button type="button" onClick={confirmReportReview}>내용 확인 완료</button></div> : null}
               <Field label="출장내용" wide hint="AI 초안을 검토·수정하세요. 줄바꿈을 유지해 출장복명서와 Excel에 반영합니다."><textarea rows="10" value={trip.reportContent} onChange={(event) => updateReportContent(event.target.value)} /></Field>
+              <div className={styles.reportApprovalNotice}><span>복명서 결재라인</span><strong>{reportApprovalLineForDocument(trip.reportApprovalLine).join(" → ")}</strong><a href="/account">환경 설정에서 변경</a></div>
               <div className={styles.documentPreview}>
                 <div><span>01</span><strong>여비지급신청서</strong><small>출장자별 {trip.participants.length}부</small></div>
                 <div><span>02</span><strong>여비지출명세서</strong><small>{Math.ceil(trip.participants.length / 5)}부 · 총 {money(expense.total)}</small></div>

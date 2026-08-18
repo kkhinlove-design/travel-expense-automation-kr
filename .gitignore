@@ -19,6 +19,7 @@ supabase/.temp/
 
 # Local tooling and logs
 .codex-tmp/
+_to_delete/
 *.log
 dev-out.log
 dev-err.log

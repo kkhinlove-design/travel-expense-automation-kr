@@ -21,6 +21,15 @@ export const DEFAULT_ORIGIN_BASES = Object.freeze([
   "부안",
 ]);
 
+export const DEFAULT_REPORT_APPROVER_TITLES = Object.freeze([
+  "팀장",
+  "센터장",
+  "사업단장",
+  "실장",
+  "본부장",
+  "원장",
+]);
+
 export function parseOriginBases(value, fallback = DEFAULT_ORIGIN_BASES) {
   const entries = String(value ?? "")
     .split(/[,;\n]/)
@@ -30,7 +39,27 @@ export function parseOriginBases(value, fallback = DEFAULT_ORIGIN_BASES) {
   return Object.freeze(uniqueEntries.length ? uniqueEntries : [...fallback]);
 }
 
+export function parseReportApproverTitles(value, fallback = DEFAULT_REPORT_APPROVER_TITLES) {
+  const entries = String(value ?? "")
+    .split(/[,;\n]/)
+    .map((item) => item.replace(/\s+/g, " ").trim())
+    .filter(Boolean);
+  const uniqueEntries = [...new Set(entries)];
+  return Object.freeze(uniqueEntries.length >= 2 ? uniqueEntries : [...fallback]);
+}
+
+function configuredApprovalLine(value, titles) {
+  const requested = String(value ?? "")
+    .split(/[,;>→\n]/)
+    .map((item) => item.replace(/\s+/g, " ").trim())
+    .filter((item) => titles.includes(item));
+  if (requested.length >= 2 && requested[0] !== requested[1]) return Object.freeze(requested.slice(0, 2));
+  if (titles.includes("실장") && titles.includes("원장")) return Object.freeze(["실장", "원장"]);
+  return Object.freeze(titles.slice(0, 2));
+}
+
 const originBases = parseOriginBases(process.env.NEXT_PUBLIC_ORIGIN_BASES);
+const reportApproverTitles = parseReportApproverTitles(process.env.NEXT_PUBLIC_REPORT_APPROVER_TITLES);
 
 export const ORGANIZATION_CONFIG = Object.freeze({
   appName: text(process.env.NEXT_PUBLIC_APP_NAME, "출장완료"),
@@ -39,6 +68,8 @@ export const ORGANIZATION_CONFIG = Object.freeze({
   brandEnglish: text(process.env.NEXT_PUBLIC_BRAND_ENGLISH, "BUSINESS TRIP DESK"),
   defaultOrigin: text(process.env.NEXT_PUBLIC_DEFAULT_ORIGIN, originBases[0]),
   originBases,
+  reportApproverTitles,
+  defaultReportApprovalLine: configuredApprovalLine(process.env.NEXT_PUBLIC_DEFAULT_REPORT_APPROVAL_LINE, reportApproverTitles),
   publicAppUrl: optionalUrl(process.env.NEXT_PUBLIC_APP_URL),
   ogImagePath: text(process.env.NEXT_PUBLIC_OG_IMAGE_PATH, "/og-travel.png"),
 });

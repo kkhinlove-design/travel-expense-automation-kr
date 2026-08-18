@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { getSupabaseUser } from "@/lib/supabase/server";
 import {
+  allowedApprovalTitlePreference,
   allowedOriginPreference,
+  approvalLinePreferenceValidationError,
   originPreferenceValidationError,
   TRAVEL_USER_PREFERENCES_TABLE,
 } from "@/lib/travel-user-preferences";
@@ -19,23 +21,29 @@ export async function PUT(request) {
 
   const validationError = originPreferenceValidationError(body?.defaultOrigin);
   if (validationError) return NextResponse.json({ error: validationError }, { status: 400 });
+  const approvalValidationError = approvalLinePreferenceValidationError(body?.reportApprovalLine);
+  if (approvalValidationError) return NextResponse.json({ error: approvalValidationError }, { status: 400 });
 
   const defaultOrigin = allowedOriginPreference(body.defaultOrigin);
+  const reportApprovalLine = body.reportApprovalLine.map((title) => allowedApprovalTitlePreference(title));
   const now = new Date().toISOString();
   const { data, error } = await client
     .from(TRAVEL_USER_PREFERENCES_TABLE)
     .upsert({
       user_id: user.id,
       default_origin: defaultOrigin,
+      report_approver_first: reportApprovalLine[0],
+      report_approver_second: reportApprovalLine[1],
       updated_at: now,
     }, { onConflict: "user_id" })
-    .select("default_origin,updated_at")
+    .select("default_origin,report_approver_first,report_approver_second,updated_at")
     .single();
 
-  if (error) return NextResponse.json({ error: "기본 출발 사무소를 저장하지 못했습니다." }, { status: 500 });
+  if (error) return NextResponse.json({ error: "출장 환경 설정을 저장하지 못했습니다." }, { status: 500 });
   return NextResponse.json({
     preference: {
       defaultOrigin: data.default_origin,
+      reportApprovalLine: [data.report_approver_first, data.report_approver_second],
       updatedAt: data.updated_at,
     },
   });

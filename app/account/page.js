@@ -8,13 +8,17 @@ export const dynamic = "force-dynamic";
 
 export const metadata = {
   title: `내 환경 설정 | ${ORGANIZATION_CONFIG.appName}`,
-  description: `${ORGANIZATION_CONFIG.appName}의 기본 출발 사무소와 계정 비밀번호를 관리합니다.`,
+  description: `${ORGANIZATION_CONFIG.appName}의 출장 기본값과 계정 비밀번호를 관리합니다.`,
 };
 
 export default async function AccountPage() {
   const user = await requireAuthenticatedUser("/account");
   const localDevelopment = user.userId === "local-development-user";
-  let preference = { defaultOrigin: ORGANIZATION_CONFIG.originBases.length === 1 ? ORGANIZATION_CONFIG.defaultOrigin : "", error: null };
+  let preference = {
+    defaultOrigin: ORGANIZATION_CONFIG.originBases.length === 1 ? ORGANIZATION_CONFIG.defaultOrigin : "",
+    reportApprovalLine: [...ORGANIZATION_CONFIG.defaultReportApprovalLine],
+    error: null,
+  };
   if (!localDevelopment) {
     const client = await createSupabaseServerClient();
     preference = await loadTravelUserPreference(client, user.userId);
@@ -26,6 +30,8 @@ export default async function AccountPage() {
       signOutPath={signOutPath("/account")}
       originBases={ORGANIZATION_CONFIG.originBases}
       initialDefaultOrigin={preference.defaultOrigin}
+      reportApproverTitles={ORGANIZATION_CONFIG.reportApproverTitles}
+      initialReportApprovalLine={preference.reportApprovalLine}
       preferenceWritable={!localDevelopment}
       preferenceLoadError={preference.error ? "저장된 기본 출발 사무소를 불러오지 못했습니다." : ""}
     />

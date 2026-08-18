@@ -148,7 +148,7 @@ npm run build
 | `NEXT_PUBLIC_ADMIN_EMAIL` | 조건부 | 브라우저 | 쉬운 최초 설치용 관리자 UI 이메일. `app_metadata.role=admin`을 쓰면 생략 가능 |
 | `DATA_GO_KR_SERVICE_KEY` | 아니요 | 서버 | TAGO 연동 서버 코드용 일반인증키. 현재 기본 UI는 비활성화되어 있으며 저장 운임·직접 입력을 우선 사용합니다. |
 
-기관명·앱 이름·출발 기준지와 Ollama 모델 등 선택 설정은 주석이 포함된 [`.env.example`](./.env.example)에서 확인할 수 있습니다. 여러 사무소는 `NEXT_PUBLIC_ORIGIN_BASES`에 쉼표로 구분해 입력합니다. 로그인한 직원은 **환경 설정**에서 기본 출발 사무소를 저장할 수 있고, 출장마다 실제 출발지가 다르면 정보 확인 화면에서 바꿀 수 있습니다. `ALLOW_LOCAL_DEV_USER=true`는 Supabase 없이 UI를 확인하는 로컬 개발에서만 사용하고 Vercel에는 설정하지 마세요.
+기관명·앱 이름·출발 기준지와 Ollama 모델 등 선택 설정은 주석이 포함된 [`.env.example`](./.env.example)에서 확인할 수 있습니다. 여러 사무소는 `NEXT_PUBLIC_ORIGIN_BASES`, 복명서 결재자 직위는 `NEXT_PUBLIC_REPORT_APPROVER_TITLES`에 쉼표로 구분해 입력합니다. 로그인한 직원은 **환경 설정**에서 기본 출발 사무소와 `1차 결재자 → 최종 결재자`를 저장할 수 있고, 출장마다 실제 출발지가 다르면 정보 확인 화면에서 바꿀 수 있습니다. `ALLOW_LOCAL_DEV_USER=true`는 Supabase 없이 UI를 확인하는 로컬 개발에서만 사용하고 Vercel에는 설정하지 마세요.
 
 이메일 기반 초기 관리자를 사용할 때는 `NEXT_PUBLIC_ADMIN_EMAIL`과 별도로 Supabase Function secret `ADMIN_EMAILS`에도 같은 이메일을 설정해야 합니다. 전자는 UI 진입용 공개 힌트이고, 실제 관리자 작업 권한은 후자의 서버 allowlist가 검증합니다. 자세한 권한 구성은 [Supabase 설정 안내](./docs/SUPABASE_SETUP.md)를 따르세요.
 
