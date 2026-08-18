@@ -54,7 +54,7 @@ function configuredApprovalLine(value, titles) {
     .map((item) => item.replace(/\s+/g, " ").trim())
     .filter((item) => titles.includes(item));
   if (requested.length >= 2 && requested[0] !== requested[1]) return Object.freeze(requested.slice(0, 2));
-  if (titles.includes("실장") && titles.includes("원장")) return Object.freeze(["실장", "원장"]);
+  if (titles.includes("팀장") && titles.includes("실장")) return Object.freeze(["팀장", "실장"]);
   return Object.freeze(titles.slice(0, 2));
 }
 

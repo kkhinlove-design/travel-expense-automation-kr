@@ -33,13 +33,13 @@ test("requires two distinct configured report approvers", () => {
 
 test("uses a saved report approval line and falls back to configured titles", () => {
   assert.deepEqual(initialReportApprovalLine(["팀장", "원장"], approvalTitles), ["팀장", "원장"]);
-  assert.deepEqual(initialReportApprovalLine(["팀장", "이사장"], approvalTitles), ["실장", "원장"]);
+  assert.deepEqual(initialReportApprovalLine(["팀장", "이사장"], approvalTitles), ["팀장", "실장"]);
   assert.deepEqual(initialReportApprovalLine(["팀장", "이사장"], ["팀장", "센터장"]), ["팀장", "센터장"]);
 });
 
 test("keeps a historical report approval line even when the current option list changes", () => {
   assert.deepEqual(reportApprovalLineForDocument(["사업부장", "이사장"]), ["사업부장", "이사장"]);
-  assert.deepEqual(reportApprovalLineForDocument(["원장", "원장"]), ["실장", "원장"]);
+  assert.deepEqual(reportApprovalLineForDocument(["원장", "원장"]), ["팀장", "실장"]);
 });
 
 test("requires a configured departure office", () => {

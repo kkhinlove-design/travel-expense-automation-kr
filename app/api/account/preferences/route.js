@@ -34,6 +34,7 @@ export async function PUT(request) {
       default_origin: defaultOrigin,
       report_approver_first: reportApprovalLine[0],
       report_approver_second: reportApprovalLine[1],
+      report_approval_configured_at: now,
       updated_at: now,
     }, { onConflict: "user_id" })
     .select("default_origin,report_approver_first,report_approver_second,updated_at")
