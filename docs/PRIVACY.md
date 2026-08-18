@@ -18,7 +18,7 @@
 ## Supabase 운영 원칙
 
 - 기관마다 별도 Supabase 프로젝트와 Vercel 배포를 사용하는 구성을 권장합니다.
-- 출장·개인 운임·환경 설정 테이블은 `auth.uid()` 기반 소유권 RLS를 적용하고, 공개 스키마 권한과 RLS를 모두 확인합니다.
+- 출장·환경 설정과 이전 버전 개인 운임 보존 테이블은 `auth.uid()` 기반 소유권 RLS를 적용하고, 공개 스키마 권한과 RLS를 모두 확인합니다. 현재 운임 자동 계산은 관리자가 등록한 공용 기준표만 사용합니다.
 - 원본 버킷은 비공개로 유지하고 사용자 자신의 경로만 읽기·쓰기·삭제하도록 제한합니다.
 - secret/service role key는 Edge Function 또는 안전한 서버 환경에만 두고 `NEXT_PUBLIC_` 변수로 노출하지 않습니다.
 - 관리자 작업은 로그인 토큰을 다시 검증한 뒤 `app_metadata.role=admin` 또는 Supabase Function secret `ADMIN_EMAILS` allowlist로 권한을 확인합니다.

@@ -197,16 +197,6 @@ function blankTrip(user, defaultOrigin = "", defaultReportApprovalLine = ORGANIZ
   };
 }
 
-function farePresetDraft(preset = {}) {
-  return {
-    id: String(preset.id || ""),
-    origin: String(preset.origin || ""),
-    destination: String(preset.destination || ""),
-    outboundFare: fareValue(preset.outboundFare ?? preset.outbound_fare),
-    returnFare: fareValue(preset.returnFare ?? preset.return_fare),
-  };
-}
-
 function tripWithFarePreset(current, item) {
   const outbound = fareValue(item.outbound_fare ?? item.outboundFare);
   const returning = fareValue(item.return_fare ?? item.returnFare);
@@ -238,39 +228,6 @@ function tripWithFarePreset(current, item) {
     fareSource: outboundSource,
     fareSources: { outbound: outboundSource, return: returnSource },
   };
-}
-
-function normalizedFareImportHeader(value) {
-  return String(value || "").replace(/\s+/g, "").trim();
-}
-
-function parseFareImportRows(rows) {
-  const expected = ["출발지", "도착지", "가는길운임", "오는길운임"];
-  const headerIndex = rows.findIndex((row) => expected.every((header, index) => normalizedFareImportHeader(row[index]) === header));
-  if (headerIndex < 0) throw new Error("엑셀에서 ‘출발지, 도착지, 가는 길 운임, 오는 길 운임’ 헤더를 찾지 못했습니다.");
-  const presets = [];
-  const routes = new Set();
-  rows.slice(headerIndex + 1).forEach((row, offset) => {
-    if (!row.slice(0, 4).some((value) => String(value ?? "").trim())) return;
-    const excelRow = headerIndex + offset + 2;
-    const origin = String(row[0] ?? "").replace(/\s+/g, " ").trim();
-    const destination = String(row[1] ?? "").replace(/\s+/g, " ").trim();
-    const outboundFare = Number(String(row[2] ?? "").replace(/,/g, ""));
-    const returnFare = Number(String(row[3] ?? "").replace(/,/g, ""));
-    if (!origin || !destination) throw new Error(`${excelRow}행: 출발지와 도착지를 모두 입력해 주세요.`);
-    if (origin === destination) throw new Error(`${excelRow}행: 출발지와 도착지는 서로 달라야 합니다.`);
-    if (![outboundFare, returnFare].every((value) => Number.isFinite(value) && Number.isSafeInteger(value) && value >= 0 && value <= MAX_FARE)) {
-      throw new Error(`${excelRow}행: 운임은 0원 이상 1,000만원 이하의 정수로 입력해 주세요.`);
-    }
-    if (!outboundFare && !returnFare) throw new Error(`${excelRow}행: 가는 길 또는 오는 길 운임을 입력해 주세요.`);
-    const routeKey = `${origin.toLocaleLowerCase("ko-KR")}\u0000${destination.toLocaleLowerCase("ko-KR")}`;
-    if (routes.has(routeKey)) throw new Error(`${excelRow}행: 같은 출발지·도착지 노선이 엑셀에 중복되어 있습니다.`);
-    routes.add(routeKey);
-    presets.push({ origin, destination, outboundFare, returnFare });
-  });
-  if (!presets.length) throw new Error("입력된 노선이 없습니다. 헤더 아래에 한 개 이상의 노선을 작성해 주세요.");
-  if (presets.length > 100) throw new Error("한 번에 최대 100개 노선까지 불러올 수 있습니다.");
-  return presets;
 }
 
 // 숫자로 읽히지 않는 값을 0원으로 그리면 잘못된 금액이 화면에도 인쇄물에도
@@ -543,9 +500,6 @@ export default function TravelWorkspace({ user, defaultOrigin, defaultReportAppr
   const [sourceMismatch, setSourceMismatch] = useState("");
   const [recentTrips, setRecentTrips] = useState([]);
   const [farePresets, setFarePresets] = useState([]);
-  const [farePreset, setFarePreset] = useState(() => farePresetDraft({ origin: defaultOrigin }));
-  const [farePresetLoading, setFarePresetLoading] = useState(true);
-  const [farePresetLoadError, setFarePresetLoadError] = useState("");
   const [fareOptions, setFareOptions] = useState([]);
   const [fareDirection, setFareDirection] = useState("outbound");
   const [fareNotice, setFareNotice] = useState("");
@@ -561,16 +515,8 @@ export default function TravelWorkspace({ user, defaultOrigin, defaultReportAppr
   const pdfInputRef = useRef(null);
   const hwpxInputRef = useRef(null);
   const parseRequestRef = useRef(0);
-  const fareImportRef = useRef(null);
   const expense = useMemo(() => calculateTripExpense(trip), [trip]);
   const hasSourceDocument = Boolean(approvedPdfFile || sourceHwpxFile);
-
-  useEffect(() => {
-    setFarePreset((current) => current.id ? current : {
-      ...current,
-      origin: trip.origin || defaultOrigin || "",
-    });
-  }, [trip.origin, defaultOrigin]);
 
   useEffect(() => {
     const hasFareSource = Boolean(trip.fareSource || trip.fareSources?.outbound || trip.fareSources?.return);
@@ -581,7 +527,7 @@ export default function TravelWorkspace({ user, defaultOrigin, defaultReportAppr
 
     const automaticMatch = findAutomaticFareMatch(trip, farePresets);
     if (automaticMatch.ambiguous && !automaticMatch.preset) {
-      setNotice(`출발지·출장지 단어에 맞는 운임이 ${automaticMatch.candidates.length}개이고 금액이 서로 다릅니다. 운임 설정에서 맞는 노선을 직접 적용해 주세요.`);
+      setNotice(`출발지·출장지 단어에 맞는 관리자 운임이 ${automaticMatch.candidates.length}개이고 금액이 서로 다릅니다. 방향별 운임을 직접 입력하거나 관리자에게 기준표 확인을 요청해 주세요.`);
       return;
     }
     const automaticPreset = automaticMatch.preset;
@@ -596,7 +542,7 @@ export default function TravelWorkspace({ user, defaultOrigin, defaultReportAppr
       if (!currentMatch.preset) return current;
       return updateReportForBasisChange(current, tripWithFarePreset(current, currentMatch.preset));
     });
-    setNotice(`저장 운임 ${automaticPreset.origin} → ${automaticPreset.destination} 왕복 ${money(fareValue(automaticPreset.outbound_fare ?? automaticPreset.outboundFare) + fareValue(automaticPreset.return_fare ?? automaticPreset.returnFare))}을 자동 적용했습니다.`);
+    setNotice(`관리자 운임 ${automaticPreset.origin} → ${automaticPreset.destination} 왕복 ${money(fareValue(automaticPreset.outbound_fare ?? automaticPreset.outboundFare) + fareValue(automaticPreset.return_fare ?? automaticPreset.returnFare))}을 자동 적용했습니다.`);
   }, [farePresets, trip.id, trip.origin, trip.destination, trip.transportDestination, trip.transportType, trip.tripScope, trip.waypoints, trip.outboundTransportActual, trip.returnTransportActual, trip.fareSource, trip.fareSources]);
 
   const update = (key, value) => {
@@ -611,7 +557,7 @@ export default function TravelWorkspace({ user, defaultOrigin, defaultReportAppr
           ...(trip.fareSource ? [trip.fareSource] : []),
         ].filter(Boolean);
         if (routeBasisChanged || (dateChanged && fareSources.some((source) => !isManualFareSource(source)))) {
-          setNotice("출장 정보가 변경되어 저장 운임을 다시 확인하고 있습니다.");
+          setNotice("출장 정보가 변경되어 관리자 운임을 다시 확인하고 있습니다.");
         }
       }
     }
@@ -649,7 +595,7 @@ export default function TravelWorkspace({ user, defaultOrigin, defaultReportAppr
   function updateOriginBase(value) {
     update("origin", value);
     setNotice(value
-      ? `${value} 사무소를 출발 기준지로 적용했습니다. 저장 운임을 다시 확인합니다.`
+      ? `${value} 사무소를 출발 기준지로 적용했습니다. 관리자 운임을 다시 확인합니다.`
       : "실제 출장 출발 사무소를 선택해 주세요.");
   }
 
@@ -880,21 +826,14 @@ export default function TravelWorkspace({ user, defaultOrigin, defaultReportAppr
     setOllama((current) => ({ ...current, model, message: `Ollama 연결됨 · ${model}` }));
   }
 
-  async function loadFarePresets({ notify = false } = {}) {
-    setFarePresetLoading(true);
-    setFarePresetLoadError("");
+  async function loadFarePresets() {
     try {
       const response = await fetch("/api/travel/fare-presets");
       const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.error || "대중교통 운임 설정을 불러오지 못했습니다.");
+      if (!response.ok) throw new Error(data.error || "관리자 운임 기준표를 불러오지 못했습니다.");
       setFarePresets(data.presets ?? []);
-      if (notify) setNotice("저장한 대중교통 운임을 다시 불러왔습니다.");
     } catch (error) {
-      const message = error instanceof Error ? error.message : "대중교통 운임 설정을 불러오지 못했습니다.";
-      setFarePresetLoadError(`${message} 잠시 후 다시 시도해 주세요.`);
-      if (notify) setNotice(message);
-    } finally {
-      setFarePresetLoading(false);
+      setNotice(error instanceof Error ? error.message : "관리자 운임 기준표를 불러오지 못했습니다.");
     }
   }
 
@@ -1051,14 +990,14 @@ export default function TravelWorkspace({ user, defaultOrigin, defaultReportAppr
     setAiProgress({ progress: 0, text: "" });
     const participantNotice = parsed.participants?.length > 1 ? ` 출장자 ${parsed.participants.length}명을 분리했습니다.` : "";
     const fareNoticeText = !nextTrip.origin
-      ? " 실제 출장 출발 사무소를 선택하면 저장 운임을 자동 적용합니다."
+      ? " 실제 출장 출발 사무소를 선택하면 관리자 운임을 자동 적용합니다."
         : automaticPreset
-          ? ` 저장 운임 ${automaticPreset.origin} → ${automaticPreset.destination} 왕복 ${money(tripTransportFares(nextTrip).total)}을 자동 적용했습니다.`
+          ? ` 관리자 운임 ${automaticPreset.origin} → ${automaticPreset.destination} 왕복 ${money(tripTransportFares(nextTrip).total)}을 자동 적용했습니다.`
           : automaticMatch.ambiguous
-            ? ` 같은 지역 단어에 금액이 다른 운임 ${automaticMatch.candidates.length}개가 있어 자동 적용하지 않았습니다. 운임 설정에서 맞는 노선을 선택해 주세요.`
+            ? ` 같은 지역 단어에 금액이 다른 관리자 운임 ${automaticMatch.candidates.length}개가 있어 자동 적용하지 않았습니다. 방향별 운임을 직접 입력하거나 관리자에게 기준표 확인을 요청해 주세요.`
         : parsed.transportType === "corporate"
           ? " 법인차는 대중교통 운임 대신 통행료·주차비를 직접 확인해 주세요."
-          : " 일치하는 저장 운임이 없어 여비계산에서 금액을 확인해 주세요.";
+          : " 일치하는 관리자 운임이 없어 여비계산에서 금액을 확인해 주세요.";
     const missingNotice = parsed.missing.length
       ? `${parsed.missing.join(", ")} 항목은 직접 확인해 주세요.`
       : `${sourceLabel}에서 승인서 주요 항목을 모두 읽었습니다.`;
@@ -1274,121 +1213,6 @@ export default function TravelWorkspace({ user, defaultOrigin, defaultReportAppr
     }
   }
 
-  function updateFarePresetDraft(key, value) {
-    setFarePreset((current) => ({
-      ...current,
-      [key]: key === "outboundFare" || key === "returnFare" ? fareValue(value) : value,
-    }));
-  }
-
-  async function saveFarePreset() {
-    if (!farePreset.origin.trim() || !farePreset.destination.trim()) {
-      setNotice("대중교통 운임의 출발지와 도착지를 모두 입력해 주세요.");
-      return;
-    }
-    if (farePreset.origin.trim() === farePreset.destination.trim()) {
-      setNotice("대중교통 운임의 출발지와 도착지는 서로 달라야 합니다.");
-      return;
-    }
-    if (!farePreset.outboundFare && !farePreset.returnFare) {
-      setNotice("가는 길 또는 오는 길 운임을 입력해 주세요.");
-      return;
-    }
-
-    setBusy("fare-preset-save");
-    try {
-      const response = await fetch("/api/travel/fare-presets", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(farePreset),
-      });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.error || "대중교통 운임을 저장하지 못했습니다.");
-      setFarePresets((current) => [data.preset, ...current.filter((item) => item.id !== data.preset.id)]);
-      setFarePresetLoadError("");
-      setFarePreset(farePresetDraft({ origin: trip.origin || defaultOrigin }));
-      setNotice(`${data.preset.origin} → ${data.preset.destination} 대중교통 운임을 내 설정에 저장했습니다.`);
-    } catch (error) {
-      setNotice(error instanceof Error ? error.message : "대중교통 운임을 저장하지 못했습니다.");
-    } finally {
-      setBusy("");
-    }
-  }
-
-  async function importFarePresets(event) {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    setBusy("fare-preset-import");
-    try {
-      const XLSX = await import("xlsx");
-      const workbook = XLSX.read(await file.arrayBuffer(), { type: "array" });
-      const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-      if (!firstSheet) throw new Error("엑셀의 첫 번째 시트를 읽을 수 없습니다.");
-      const rows = XLSX.utils.sheet_to_json(firstSheet, { header: 1, defval: "", raw: true });
-      const presets = parseFareImportRows(rows);
-      const response = await fetch("/api/travel/fare-presets", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ presets }),
-      });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.error || "엑셀 운임을 저장하지 못했습니다.");
-      const savedIds = new Set(data.presets.map((item) => item.id));
-      setFarePresets((current) => [...data.presets, ...current.filter((item) => !savedIds.has(item.id))]);
-      setFarePresetLoadError("");
-      setNotice(`엑셀 운임 ${data.presets.length}개를 반영했습니다. 새 노선 ${data.created}개 · 기존 노선 수정 ${data.updated}개입니다.`);
-    } catch (error) {
-      setNotice(error instanceof Error ? error.message : "엑셀 운임을 불러오지 못했습니다.");
-    } finally {
-      event.target.value = "";
-      setBusy("");
-    }
-  }
-
-  function editFarePreset(item) {
-    setFarePreset(farePresetDraft(item));
-    setNotice(`${item.origin} → ${item.destination} 운임을 수정할 수 있습니다.`);
-  }
-
-  async function deleteFarePreset(item) {
-    if (!window.confirm(`${item.origin} → ${item.destination} 대중교통 운임 설정을 삭제할까요?`)) return;
-    setBusy(`fare-preset-delete-${item.id}`);
-    try {
-      const response = await fetch(`/api/travel/fare-presets?id=${encodeURIComponent(item.id)}`, { method: "DELETE" });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok && response.status !== 404) throw new Error(data.error || "대중교통 운임을 삭제하지 못했습니다.");
-      setFarePresets((current) => current.filter((preset) => preset.id !== item.id));
-      if (farePreset.id === item.id) setFarePreset(farePresetDraft({ origin: trip.origin || defaultOrigin }));
-      setNotice(response.status === 404 ? "이미 삭제된 운임 설정을 목록에서 정리했습니다." : "대중교통 운임 설정을 삭제했습니다.");
-    } catch (error) {
-      setNotice(error instanceof Error ? error.message : "대중교통 운임을 삭제하지 못했습니다.");
-    } finally {
-      setBusy("");
-    }
-  }
-
-  function applyFarePreset(item) {
-    if (trip.tripScope === "local") {
-      setNotice("근무지내 출장은 교통 운임이 지급되지 않아 이 설정을 적용할 수 없습니다.");
-      return;
-    }
-    if (trip.transportType === "corporate") {
-      setNotice("법인차는 통행료·주차비만 받을 수 있어 대중교통 운임 설정을 적용할 수 없습니다.");
-      return;
-    }
-    const waypointCount = normalizeTripWaypoints(trip).length;
-    if (waypointCount && !window.confirm(`현재 입력한 경유지 ${waypointCount}곳이 있습니다.\n저장한 직행 노선을 적용하면 경유지가 초기화됩니다. 계속할까요?`)) return;
-
-    setTrip((current) => {
-      const next = tripWithFarePreset(current, item);
-      return updateReportForBasisChange(current, next);
-    });
-    setFareOptions([]);
-    setFareNotice("");
-    setActiveSection("review");
-    setNotice(`${item.origin} → ${item.destination} 노선과 왕복 운임 ${money(Number(item.outbound_fare) + Number(item.return_fare))}을 출장에 적용했습니다.${waypointCount ? " 기존 경유지는 초기화했습니다." : ""}`);
-  }
-
   async function downloadExcel() {
     const validationError = finalDocumentError();
     if (validationError) {
@@ -1526,7 +1350,6 @@ export default function TravelWorkspace({ user, defaultOrigin, defaultReportAppr
     setFareOptions([]);
     setFareDirection("outbound");
     setFareNotice("");
-    setFarePreset(farePresetDraft({ origin: defaultOrigin }));
     setAiProgress({ progress: 0, text: "" });
     setNotice(defaultOrigin
       ? `새 출장의 기본 출발지를 ${defaultOrigin} 사무소로 적용했습니다.`
@@ -1537,7 +1360,7 @@ export default function TravelWorkspace({ user, defaultOrigin, defaultReportAppr
     <main className={styles.travelApp}>
       <header className={styles.header}>
         <a href="/" className={styles.brand}><span>出</span><div><strong>{ORGANIZATION_CONFIG.appName}</strong><small>{ORGANIZATION_CONFIG.brandEnglish}</small></div></a>
-        <nav aria-label="주요 메뉴"><a className={activeSection === "settings" ? "" : styles.navActive} href="#workspace" onClick={() => { if (activeSection === "settings") setActiveSection("review"); }}>새 서류</a><a href="#recent">내 출장</a><a href="#policy">규정 기준</a><a className={activeSection === "settings" ? styles.navActive : ""} href="#workspace" onClick={() => setActiveSection("settings")}>운임 설정</a></nav>
+        <nav aria-label="주요 메뉴"><a className={styles.navActive} href="#workspace">새 서류</a><a href="#recent">내 출장</a><a href="#policy">규정 기준</a></nav>
         <div className={styles.account}><span>{(user.displayName || user.email).slice(0, 1).toUpperCase()}</span><div><strong>{user.displayName}</strong><small>{user.email}</small></div><a href="/account">환경 설정</a><a href={signOutPath}>로그아웃</a></div>
       </header>
 
@@ -1586,7 +1409,6 @@ export default function TravelWorkspace({ user, defaultOrigin, defaultReportAppr
           <button className={activeSection === "review" ? styles.sideActive : ""} onClick={() => setActiveSection("review")}><b>1</b><span>출장 정보 확인<small>승인서 자동 추출</small></span></button>
           <button className={activeSection === "expense" ? styles.sideActive : ""} onClick={openExpenseSection}><b>2</b><span>여비 계산<small>규정 자동 적용</small></span></button>
           <button className={activeSection === "report" ? styles.sideActive : ""} onClick={openReportSection}><b>3</b><span>복명서 작성<small>출장 결과 보완</small></span></button>
-          <button className={activeSection === "settings" ? styles.sideActive : ""} onClick={() => setActiveSection("settings")}><b>4</b><span>운임 설정<small>수동 노선 저장</small></span></button>
           <div className={styles.sideNotice}><span>i</span><p>{notice}</p></div>
           <button className={styles.resetButton} type="button" onClick={resetTrip} disabled={Boolean(busy)}>새 출장 시작</button>
         </aside>
@@ -1607,7 +1429,7 @@ export default function TravelWorkspace({ user, defaultOrigin, defaultReportAppr
                 </div>
                 <Field label="출발 일시"><input type="datetime-local" value={trip.startAt} onChange={(event) => update("startAt", event.target.value)} /></Field>
                 <Field label="도착 일시"><input type="datetime-local" value={trip.endAt} onChange={(event) => update("endAt", event.target.value)} /></Field>
-                <Field label="출발 기준지(사무소)" hint="실제 출발 사무소를 선택하면 저장 운임과 제출 서류에 동일하게 반영됩니다.">
+                <Field label="출발 기준지(사무소)" hint="실제 출발 사무소를 선택하면 관리자 운임과 제출 서류에 동일하게 반영됩니다.">
                   <select value={trip.origin} onChange={(event) => updateOriginBase(event.target.value)}>
                     <option value="">출발 기준지 선택</option>
                     {ORGANIZATION_CONFIG.originBases.map((origin) => <option key={origin} value={origin}>{origin} 사무소</option>)}
@@ -1735,38 +1557,6 @@ export default function TravelWorkspace({ user, defaultOrigin, defaultReportAppr
             </section>
           ) : null}
 
-          {activeSection === "settings" ? (
-            <section id="fare-settings" className={styles.panel}>
-              <div className={styles.panelHeading}><div><p>SETTINGS</p><h2>대중교통 운임 설정</h2><span>자주 쓰는 노선의 출발지·도착지와 방향별 운임을 내 계정에 저장합니다.</span></div><em>{farePresetLoading ? "불러오는 중" : `${farePresets.length}개 노선`}</em></div>
-              <div className={styles.fareImportBox}>
-                <div><strong>엑셀로 여러 노선 등록</strong><span>양식을 내려받아 첫 번째 시트에 작성한 뒤 그대로 불러오세요. 같은 노선은 기존 값을 수정합니다.</span></div>
-                <div><a href="/templates/travel-fare-import-template.xlsx" download>엑셀 양식 다운로드</a><button type="button" onClick={() => fareImportRef.current?.click()} disabled={Boolean(busy)}>{busy === "fare-preset-import" ? "불러오는 중…" : "작성한 엑셀 불러오기"}</button><input ref={fareImportRef} type="file" accept=".xlsx,.xls" onChange={importFarePresets} hidden /></div>
-              </div>
-              <div className={styles.farePresetForm}>
-                <Field label="출발 기준지(사무소)" hint="출장 정보 확인 화면과 같은 기준지를 사용합니다.">
-                  <select value={farePreset.origin} onChange={(event) => updateFarePresetDraft("origin", event.target.value)}>
-                    <option value="">출발 기준지 선택</option>
-                    {ORGANIZATION_CONFIG.originBases.map((origin) => <option key={origin} value={origin}>{origin} 사무소</option>)}
-                    {farePreset.origin && !ORGANIZATION_CONFIG.originBases.includes(farePreset.origin) ? <option value={farePreset.origin}>{farePreset.origin} (기존 저장값)</option> : null}
-                  </select>
-                </Field>
-                <Field label="도착지"><input value={farePreset.destination} onChange={(event) => updateFarePresetDraft("destination", event.target.value)} placeholder="예: 남원시외버스터미널" /></Field>
-                <Field label="가는 길 운임"><input type="number" min="0" max="10000000" step="100" value={farePreset.outboundFare} onFocus={selectZeroNumber} onClick={selectZeroNumber} onChange={(event) => updateFarePresetDraft("outboundFare", event.target.value)} /></Field>
-                <Field label="오는 길 운임"><input type="number" min="0" max="10000000" step="100" value={farePreset.returnFare} onFocus={selectZeroNumber} onClick={selectZeroNumber} onChange={(event) => updateFarePresetDraft("returnFare", event.target.value)} /></Field>
-                <div className={styles.farePresetFormActions}>{farePreset.id ? <button type="button" className={styles.secondaryButton} onClick={() => setFarePreset(farePresetDraft({ origin: trip.origin || defaultOrigin }))} disabled={Boolean(busy)}>수정 취소</button> : null}<button type="button" className={styles.primaryButton} onClick={saveFarePreset} disabled={Boolean(busy)}>{busy === "fare-preset-save" ? "저장 중…" : farePreset.id ? "운임 수정" : "운임 저장"}</button></div>
-              </div>
-              <p className={styles.farePresetGuide}>관리자가 등록한 공용 기준표가 같은 노선의 개인 설정보다 항상 먼저 적용됩니다. 공용 기준표가 없는 노선만 내 계정의 보조 운임을 사용합니다. 법인차와 근무지내 출장에는 적용할 수 없습니다.</p>
-              {farePresetLoadError ? <div className={styles.farePresetLoadError}><span>{farePresetLoadError}</span><button type="button" onClick={() => loadFarePresets({ notify: true })} disabled={farePresetLoading}>다시 불러오기</button></div> : null}
-              <div className={styles.farePresetList}>
-                {farePresets.length ? farePresets.map((item) => (
-                  <article className={styles.farePresetCard} key={item.id}>
-                    <div><strong>{item.origin} → {item.destination}</strong><span>{item.scope === "global" ? "관리자 공용 기준표" : "내 계정 보조 운임"} · 가는 길 {money(item.outbound_fare)} · 오는 길 {money(item.return_fare)} · 합계 {money(Number(item.outbound_fare) + Number(item.return_fare))}</span></div>
-                    <div className={styles.farePresetCardActions}><button type="button" onClick={() => applyFarePreset(item)} disabled={Boolean(busy) || trip.tripScope === "local" || trip.transportType === "corporate"} title={trip.tripScope === "local" || trip.transportType === "corporate" ? "현재 출장에는 적용할 수 없습니다." : "이 노선과 운임을 현재 출장에 적용"}>출장에 적용</button>{item.scope !== "global" ? <><button type="button" onClick={() => editFarePreset(item)} disabled={Boolean(busy)}>수정</button><button type="button" onClick={() => deleteFarePreset(item)} disabled={Boolean(busy)}>{busy === `fare-preset-delete-${item.id}` ? "삭제 중…" : "삭제"}</button></> : <span className={styles.farePresetManagedBadge}>관리자 관리</span>}</div>
-                  </article>
-                )) : !farePresetLoading && !farePresetLoadError ? <div className={styles.farePresetEmpty}>저장한 대중교통 운임이 없습니다. 위에서 첫 노선을 등록해 주세요.</div> : null}
-              </div>
-            </section>
-          ) : null}
         </div>
       </section>
 

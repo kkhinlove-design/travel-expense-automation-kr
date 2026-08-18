@@ -5,7 +5,7 @@
 ## 설치되는 항목
 
 - `public.travel_trips`: 로그인 사용자별 출장/정산 데이터
-- `public.travel_fare_presets`: 로그인 사용자별 개인 운임 기준
+- `public.travel_fare_presets`: 이전 버전의 사용자별 개인 운임 보존용(현재 직원 UI·자동 계산에서는 사용하지 않음)
 - `public.travel_user_preferences`: 로그인 사용자별 기본 출발 사무소
 - `public.travel_fare_catalog`: 전 직원이 읽는 관리자 공용 운임 기준
 - 비공개 Storage 버킷 `travel-sources`

@@ -389,9 +389,10 @@ export default function AdminPage() {
         {bulkMessage ? <p style={{ color: "#16704f", lineHeight: 1.6 }}>{bulkMessage}</p> : null}
         {bulkError ? <p role="alert" style={{ color: "#b42318", lineHeight: 1.6 }}>{bulkError}</p> : null}
       </section>
-      <section style={{ width: "min(100%, 720px)", boxSizing: "border-box", padding: 32, borderRadius: 18, background: "#fff", boxShadow: "0 14px 50px #1d2b4418" }}>
+      <section id="fare-settings" style={{ width: "min(100%, 720px)", boxSizing: "border-box", padding: 32, borderRadius: 18, background: "#fff", boxShadow: "0 14px 50px #1d2b4418" }}>
+        <p style={{ margin: "0 0 6px", color: "#2359ad", fontSize: 13, fontWeight: 800, letterSpacing: ".08em" }}>운임 설정</p>
         <h2 style={{ margin: 0 }}>공용 대중교통 운임 기준표</h2>
-        <p style={{ color: "#667085", lineHeight: 1.6 }}>여기 업로드한 노선은 모든 직원에게 동일하게 제공되며, 개인이 저장한 같은 노선보다 우선 적용됩니다. 같은 노선은 새 금액으로 교체되고, 파일에 빠진 기존 노선은 안전하게 보존됩니다.</p>
+        <p style={{ color: "#667085", lineHeight: 1.6 }}>관리자가 올린 노선만 전 직원의 자동 운임 계산에 적용됩니다. 직원 화면에서는 기준표를 조회·수정할 수 없으며, 같은 노선을 다시 올리면 새 금액으로 교체되고 파일에 빠진 기존 노선은 안전하게 보존됩니다.</p>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 18 }}>
           <a href="/templates/travel-fare-import-template.xlsx" download style={{ display: "inline-flex", alignItems: "center", padding: "11px 14px", border: "1px solid #b9c7dc", borderRadius: 8, background: "#f5f8fc", color: "#214b8e", fontWeight: 700, textDecoration: "none" }}>공용 운임 양식 다운로드</a>
           <label style={{ display: "inline-flex", alignItems: "center", padding: "11px 14px", borderRadius: 8, background: "#214b8e", color: "#fff", fontWeight: 700, cursor: "pointer" }}>
