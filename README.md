@@ -113,7 +113,7 @@ Supabase Auth의 Site URL과 Redirect URL을 실제 Vercel 주소로 설정한 �
 
 | 바꿀 항목 | 설정 위치 |
 | --- | --- |
-| 앱 이름, 기관명, 기본 출발지 | [`.env.example`](./.env.example)의 `NEXT_PUBLIC_*` 항목 |
+| 앱 이름, 기관명, 출발 기준지 목록 | [`.env.example`](./.env.example)의 `NEXT_PUBLIC_*` 항목 |
 | 일비·식비·숙박 상한과 차량 규칙 | [`config/travel-policy.js`](./config/travel-policy.js) |
 | Excel 원본 양식 | [`public/templates/travel-template.xlsx`](./public/templates/travel-template.xlsx)와 [`lib/travel-excel.js`](./lib/travel-excel.js)의 셀 매핑 |
 | 관리자 권한 | Supabase `app_metadata.role` 또는 Function secret `ADMIN_EMAILS` |
@@ -148,7 +148,7 @@ npm run build
 | `NEXT_PUBLIC_ADMIN_EMAIL` | 조건부 | 브라우저 | 쉬운 최초 설치용 관리자 UI 이메일. `app_metadata.role=admin`을 쓰면 생략 가능 |
 | `DATA_GO_KR_SERVICE_KEY` | 아니요 | 서버 | TAGO 연동 서버 코드용 일반인증키. 현재 기본 UI는 비활성화되어 있으며 저장 운임·직접 입력을 우선 사용합니다. |
 
-기관명·앱 이름·기본 출발지와 Ollama 모델 등 선택 설정은 주석이 포함된 [`.env.example`](./.env.example)에서 확인할 수 있습니다. `ALLOW_LOCAL_DEV_USER=true`는 Supabase 없이 UI를 확인하는 로컬 개발에서만 사용하고 Vercel에는 설정하지 마세요.
+기관명·앱 이름·출발 기준지와 Ollama 모델 등 선택 설정은 주석이 포함된 [`.env.example`](./.env.example)에서 확인할 수 있습니다. 여러 사무소는 `NEXT_PUBLIC_ORIGIN_BASES`에 쉼표로 구분해 입력하며, 목록이 두 곳 이상이면 새 출장마다 실제 출발 사무소를 선택합니다. `ALLOW_LOCAL_DEV_USER=true`는 Supabase 없이 UI를 확인하는 로컬 개발에서만 사용하고 Vercel에는 설정하지 마세요.
 
 이메일 기반 초기 관리자를 사용할 때는 `NEXT_PUBLIC_ADMIN_EMAIL`과 별도로 Supabase Function secret `ADMIN_EMAILS`에도 같은 이메일을 설정해야 합니다. 전자는 UI 진입용 공개 힌트이고, 실제 관리자 작업 권한은 후자의 서버 allowlist가 검증합니다. 자세한 권한 구성은 [Supabase 설정 안내](./docs/SUPABASE_SETUP.md)를 따르세요.
 

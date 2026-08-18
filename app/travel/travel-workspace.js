@@ -162,7 +162,7 @@ function blankTrip(user) {
     purpose: "",
     destination: "",
     transportDestination: "",
-    origin: ORGANIZATION_CONFIG.defaultOrigin,
+    origin: ORGANIZATION_CONFIG.originBases.length > 1 ? "" : ORGANIZATION_CONFIG.defaultOrigin,
     waypoints: [],
     startAt: "",
     endAt: "",
@@ -622,6 +622,31 @@ export default function TravelWorkspace({ user, signOutPath }) {
     });
   };
 
+  function updateOriginBase(value) {
+    update("origin", value);
+    setNotice(value
+      ? `${value} 사무소를 출발 기준지로 적용했습니다. 저장 운임을 다시 확인합니다.`
+      : "실제 출장 출발 사무소를 선택해 주세요.");
+  }
+
+  function openExpenseSection() {
+    if (!String(trip.origin || "").trim()) {
+      setNotice("실제 출장 출발 사무소를 선택해 주세요.");
+      setActiveSection("review");
+      return;
+    }
+    setActiveSection("expense");
+  }
+
+  function openReportSection() {
+    if (!String(trip.origin || "").trim()) {
+      setNotice("복명서 작성 전에 실제 출장 출발 사무소를 선택해 주세요.");
+      setActiveSection("review");
+      return;
+    }
+    setActiveSection("report");
+  }
+
   function updateReportContent(value) {
     setTrip((current) => ({
       ...current,
@@ -976,11 +1001,13 @@ export default function TravelWorkspace({ user, signOutPath }) {
     });
     setAiProgress({ progress: 0, text: "" });
     const participantNotice = parsed.participants?.length > 1 ? ` 출장자 ${parsed.participants.length}명을 분리했습니다.` : "";
-    const fareNoticeText = automaticPreset
-      ? ` 저장 운임 ${automaticPreset.origin} → ${automaticPreset.destination} 왕복 ${money(tripTransportFares(nextTrip).total)}을 자동 적용했습니다.`
-      : parsed.transportType === "corporate"
-        ? " 법인차는 대중교통 운임 대신 통행료·주차비를 직접 확인해 주세요."
-        : " 일치하는 저장 운임이 없어 여비계산에서 금액을 확인해 주세요.";
+    const fareNoticeText = !nextTrip.origin
+      ? " 실제 출장 출발 사무소를 선택하면 저장 운임을 자동 적용합니다."
+      : automaticPreset
+        ? ` 저장 운임 ${automaticPreset.origin} → ${automaticPreset.destination} 왕복 ${money(tripTransportFares(nextTrip).total)}을 자동 적용했습니다.`
+        : parsed.transportType === "corporate"
+          ? " 법인차는 대중교통 운임 대신 통행료·주차비를 직접 확인해 주세요."
+          : " 일치하는 저장 운임이 없어 여비계산에서 금액을 확인해 주세요.";
     const missingNotice = parsed.missing.length
       ? `${parsed.missing.join(", ")} 항목은 직접 확인해 주세요.`
       : `${sourceLabel}에서 승인서 주요 항목을 모두 읽었습니다.`;
@@ -1503,8 +1530,8 @@ export default function TravelWorkspace({ user, signOutPath }) {
       <section id="workspace" className={styles.workspace}>
         <aside className={styles.sidebar}>
           <button className={activeSection === "review" ? styles.sideActive : ""} onClick={() => setActiveSection("review")}><b>1</b><span>출장 정보 확인<small>승인서 자동 추출</small></span></button>
-          <button className={activeSection === "expense" ? styles.sideActive : ""} onClick={() => setActiveSection("expense")}><b>2</b><span>여비 계산<small>규정 자동 적용</small></span></button>
-          <button className={activeSection === "report" ? styles.sideActive : ""} onClick={() => setActiveSection("report")}><b>3</b><span>복명서 작성<small>출장 결과 보완</small></span></button>
+          <button className={activeSection === "expense" ? styles.sideActive : ""} onClick={openExpenseSection}><b>2</b><span>여비 계산<small>규정 자동 적용</small></span></button>
+          <button className={activeSection === "report" ? styles.sideActive : ""} onClick={openReportSection}><b>3</b><span>복명서 작성<small>출장 결과 보완</small></span></button>
           <button className={activeSection === "settings" ? styles.sideActive : ""} onClick={() => setActiveSection("settings")}><b>4</b><span>운임 설정<small>수동 노선 저장</small></span></button>
           <div className={styles.sideNotice}><span>i</span><p>{notice}</p></div>
           <button className={styles.resetButton} type="button" onClick={resetTrip} disabled={Boolean(busy)}>새 출장 시작</button>
@@ -1513,7 +1540,7 @@ export default function TravelWorkspace({ user, signOutPath }) {
         <div className={styles.editor}>
           {activeSection === "review" ? (
             <section className={styles.panel}>
-              <div className={styles.panelHeading}><div><p>STEP 01</p><h2>승인서 정보 확인</h2><span>자동 추출된 값은 모두 수정할 수 있습니다.</span></div><em>{trip.missing.length ? `${trip.missing.length}개 확인 필요` : hasSourceDocument ? "추출 완료" : "문서 대기"}</em></div>
+              <div className={styles.panelHeading}><div><p>STEP 01</p><h2>승인서 정보 확인</h2><span>자동 추출된 값은 모두 수정할 수 있습니다.</span></div><em>{!trip.origin ? "출발지 선택 필요" : trip.missing.length ? `${trip.missing.length}개 확인 필요` : hasSourceDocument ? "추출 완료" : "문서 대기"}</em></div>
               <div className={styles.fieldGrid}>
                 <Field label="문서번호"><input value={trip.documentNumber} onChange={(event) => update("documentNumber", event.target.value)} placeholder="예: 기업성장실-138" /></Field>
                 <Field label="문서제목"><input value={trip.documentTitle} onChange={(event) => update("documentTitle", event.target.value)} placeholder="출장신청_날짜_성명" /></Field>
@@ -1526,7 +1553,13 @@ export default function TravelWorkspace({ user, signOutPath }) {
                 </div>
                 <Field label="출발 일시"><input type="datetime-local" value={trip.startAt} onChange={(event) => update("startAt", event.target.value)} /></Field>
                 <Field label="도착 일시"><input type="datetime-local" value={trip.endAt} onChange={(event) => update("endAt", event.target.value)} /></Field>
-                <Field label="출발지"><input value={trip.origin} onChange={(event) => update("origin", event.target.value)} /></Field>
+                <Field label="출발 기준지(사무소)" hint="실제 출발 사무소를 선택하면 저장 운임과 제출 서류에 동일하게 반영됩니다.">
+                  <select value={trip.origin} onChange={(event) => updateOriginBase(event.target.value)}>
+                    <option value="">출발 기준지 선택</option>
+                    {ORGANIZATION_CONFIG.originBases.map((origin) => <option key={origin} value={origin}>{origin} 사무소</option>)}
+                    {trip.origin && !ORGANIZATION_CONFIG.originBases.includes(trip.origin) ? <option value={trip.origin}>{trip.origin} (기존 저장값)</option> : null}
+                  </select>
+                </Field>
                 <Field label="교통 도착지" hint="미입력 시 출장지(방문기관)와 동일하게 작성됩니다."><input value={trip.transportDestination || ""} onChange={(event) => update("transportDestination", event.target.value)} placeholder="예: 남원시외버스터미널" /></Field>
                 <Field label="교통수단"><select value={trip.transportType} onChange={(event) => update("transportType", event.target.value)}>{TRANSPORT_TYPES.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></Field>
               </div>
@@ -1545,7 +1578,7 @@ export default function TravelWorkspace({ user, signOutPath }) {
                   ))}
                 </div>
               </section>
-              <div className={styles.panelFooter}><button type="button" className={styles.primaryButton} onClick={() => setActiveSection("expense")}>여비 계산 확인 →</button></div>
+              <div className={styles.panelFooter}><button type="button" className={styles.primaryButton} onClick={openExpenseSection}>여비 계산 확인 →</button></div>
             </section>
           ) : null}
 
@@ -1656,7 +1689,13 @@ export default function TravelWorkspace({ user, signOutPath }) {
                 <div><a href="/templates/travel-fare-import-template.xlsx" download>엑셀 양식 다운로드</a><button type="button" onClick={() => fareImportRef.current?.click()} disabled={Boolean(busy)}>{busy === "fare-preset-import" ? "불러오는 중…" : "작성한 엑셀 불러오기"}</button><input ref={fareImportRef} type="file" accept=".xlsx,.xls" onChange={importFarePresets} hidden /></div>
               </div>
               <div className={styles.farePresetForm}>
-                <Field label="출발지"><input value={farePreset.origin} onChange={(event) => updateFarePresetDraft("origin", event.target.value)} placeholder={`예: ${ORGANIZATION_CONFIG.defaultOrigin} 교통 거점`} /></Field>
+                <Field label="출발 기준지(사무소)" hint="출장 정보 확인 화면과 같은 기준지를 사용합니다.">
+                  <select value={farePreset.origin} onChange={(event) => updateFarePresetDraft("origin", event.target.value)}>
+                    <option value="">출발 기준지 선택</option>
+                    {ORGANIZATION_CONFIG.originBases.map((origin) => <option key={origin} value={origin}>{origin} 사무소</option>)}
+                    {farePreset.origin && !ORGANIZATION_CONFIG.originBases.includes(farePreset.origin) ? <option value={farePreset.origin}>{farePreset.origin} (기존 저장값)</option> : null}
+                  </select>
+                </Field>
                 <Field label="도착지"><input value={farePreset.destination} onChange={(event) => updateFarePresetDraft("destination", event.target.value)} placeholder="예: 남원시외버스터미널" /></Field>
                 <Field label="가는 길 운임"><input type="number" min="0" max="10000000" step="100" value={farePreset.outboundFare} onFocus={selectZeroNumber} onClick={selectZeroNumber} onChange={(event) => updateFarePresetDraft("outboundFare", event.target.value)} /></Field>
                 <Field label="오는 길 운임"><input type="number" min="0" max="10000000" step="100" value={farePreset.returnFare} onFocus={selectZeroNumber} onClick={selectZeroNumber} onChange={(event) => updateFarePresetDraft("returnFare", event.target.value)} /></Field>
