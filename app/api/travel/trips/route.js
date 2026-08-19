@@ -6,6 +6,7 @@ import {
   tripRouteValidationError,
 } from "@/lib/travel-rules";
 import { getSupabaseUser } from "@/lib/supabase/server";
+import { uploadTravelSourceObject } from "@/lib/travel-source-storage";
 
 const SOURCE_BUCKET = "travel-sources";
 const MAX_SOURCE_FILE_SIZE = 4 * 1024 * 1024;
@@ -166,13 +167,23 @@ async function uploadSource(client, file, role, prefix) {
   // canonical type so the private bucket allowlist behaves consistently.
   const contentType = definition.contentType;
   const objectKey = `${prefix}${role}-${crypto.randomUUID()}-${filename}`;
-  const { error } = await client.storage.from(SOURCE_BUCKET).upload(objectKey, file, {
+  const { error } = await uploadTravelSourceObject(
+    client.storage.from(SOURCE_BUCKET),
+    objectKey,
+    file,
     contentType,
-    upsert: false,
-  });
-  if (error) throw new Error(role === "approvedPdf"
-    ? "승인 PDF를 저장하지 못했습니다."
-    : "HWPX 원본을 저장하지 못했습니다.");
+  );
+  if (error) {
+    console.error("[travel-source-upload]", {
+      role,
+      status: error.status,
+      code: error.code || error.statusCode,
+      message: error.message,
+    });
+    throw new Error(role === "approvedPdf"
+      ? "승인 PDF를 저장하지 못했습니다. 파일 형식과 4MB 제한을 확인해 주세요."
+      : "HWPX 원본을 저장하지 못했습니다. 파일 형식과 4MB 제한을 확인해 주세요.");
+  }
   return { objectKey, filename, contentType };
 }
 
