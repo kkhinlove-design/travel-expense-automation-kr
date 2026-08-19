@@ -7,6 +7,7 @@ import {
 } from "@/lib/travel-rules";
 import { getSupabaseUser } from "@/lib/supabase/server";
 import { uploadTravelSourceObject } from "@/lib/travel-source-storage";
+import { isTravelRecordCompleted, safeTravelTimestamp, TRAVEL_RECORD_STATUS } from "@/lib/travel-ledger";
 
 const SOURCE_BUCKET = "travel-sources";
 const MAX_SOURCE_FILE_SIZE = 4 * 1024 * 1024;
@@ -16,10 +17,10 @@ const SOURCE_ROLES = {
   sourceHwpx: { fallbackName: "source.hwpx", contentType: "application/vnd.hancom.hwpx" },
 };
 
-function summary(trip, expense, updatedAt, sourceObjectKey = null) {
+function summary(trip, expense, updatedAt, sourceObjectKey = null, status = TRAVEL_RECORD_STATUS.completed) {
   return {
     id: trip.id,
-    status: "saved",
+    status,
     document_number: trip.documentNumber || null,
     department: trip.department || null,
     employee_name: trip.employeeName || null,
@@ -33,7 +34,16 @@ function summary(trip, expense, updatedAt, sourceObjectKey = null) {
     updated_at: updatedAt,
     participant_count: Array.isArray(trip.participants) ? trip.participants.length : 1,
     source_object_key: sourceObjectKey,
+    payload: clientPayload(trip),
   };
+}
+
+function clientPayload(trip) {
+  if (!trip || typeof trip !== "object" || Array.isArray(trip)) return null;
+  const payload = { ...trip };
+  delete payload.parsedText;
+  delete payload.sourceDocuments;
+  return payload;
 }
 
 function validFare(value) {
@@ -219,13 +229,13 @@ export async function GET() {
     .select("id,status,document_number,department,employee_name,purpose,destination,start_at,end_at,transport_type,project_type,total_amount,updated_at,payload_json")
     .eq("user_id", user.id)
     .order("updated_at", { ascending: false })
-    .limit(20);
+    .limit(200);
   if (error) return NextResponse.json({ error: "출장 목록을 불러오지 못했습니다." }, { status: 500 });
   return NextResponse.json({
     trips: (data || []).map((row) => {
       const participantCount = Math.max(1, row.payload_json?.participants?.length || 1);
       const { payload_json, ...rest } = row;
-      return { ...rest, participant_count: participantCount };
+      return { ...rest, participant_count: participantCount, payload: clientPayload(payload_json) };
     }),
   });
 }
@@ -245,34 +255,11 @@ export async function POST(request) {
     return NextResponse.json({ error: "출장 데이터 형식이 올바르지 않습니다." }, { status: 400 });
   }
 
-  const tripId = validTripId(trip.id);
+  let tripId = validTripId(trip.id);
   if (!tripId) return NextResponse.json({ error: "출장 문서 ID가 올바르지 않습니다." }, { status: 400 });
   trip.id = tripId;
   delete trip.parsedText;
-  if (!VALID_TRANSPORT_TYPES.has(trip.transportType)) {
-    return NextResponse.json({ error: "교통수단을 대중교통, 개인차 또는 법인차 중에서 선택해 주세요." }, { status: 400 });
-  }
-  const requiredInformationError = tripRequiredInformationValidationError(trip);
-  if (requiredInformationError) {
-    return NextResponse.json({ error: requiredInformationError }, { status: 400 });
-  }
-  const dateError = tripDateValidationError(trip.startAt, trip.endAt);
-  if (dateError) return NextResponse.json({ error: dateError }, { status: 400 });
-
-  const outbound = validFare(trip.outboundTransportActual);
-  const returning = validFare(trip.returnTransportActual);
-  if (outbound === null || returning === null) {
-    return NextResponse.json({ error: "방향별 운임은 0원 이상 1,000만 원 이하의 숫자로 입력해 주세요." }, { status: 400 });
-  }
-  trip.outboundTransportActual = outbound;
-  trip.returnTransportActual = returning;
-  trip.transportActual = outbound + returning;
-  const participantAmountError = participantAmountValidationError(trip);
-  if (participantAmountError) return NextResponse.json({ error: participantAmountError }, { status: 400 });
-  const routeError = tripRouteValidationError(trip);
-  if (routeError) return NextResponse.json({ error: routeError }, { status: 400 });
-  const expense = calculateTripExpense(trip);
-  trip.expense = expense;
+  const registerApproved = String(form.get("intent") || "") === "register-approved";
 
   const approvedPdf = fileValue(form.get("approvedPdf")) || fileValue(form.get("file"));
   const sourceHwpx = fileValue(form.get("sourceHwpx"));
@@ -282,16 +269,72 @@ export async function POST(request) {
   if ((approvedPdf?.size || 0) + (sourceHwpx?.size || 0) > MAX_SOURCE_FILE_SIZE) {
     return NextResponse.json({ error: "PDF와 HWPX 파일 크기 합계는 4MB 이하여야 합니다." }, { status: 400 });
   }
+  if (registerApproved && !approvedPdf && !sourceHwpx) {
+    return NextResponse.json({ error: "출장대장 등록에는 승인 PDF 또는 원본 HWPX가 필요합니다." }, { status: 400 });
+  }
 
-  const prefix = sourcePrefix(user.id, tripId);
-  const { data: existing, error: existingError } = await client
+  let expense = { total: 0 };
+  if (!registerApproved) {
+    if (!VALID_TRANSPORT_TYPES.has(trip.transportType)) {
+      return NextResponse.json({ error: "교통수단을 대중교통, 개인차 또는 법인차 중에서 선택해 주세요." }, { status: 400 });
+    }
+    const requiredInformationError = tripRequiredInformationValidationError(trip);
+    if (requiredInformationError) {
+      return NextResponse.json({ error: requiredInformationError }, { status: 400 });
+    }
+    const dateError = tripDateValidationError(trip.startAt, trip.endAt);
+    if (dateError) return NextResponse.json({ error: dateError }, { status: 400 });
+
+    const outbound = validFare(trip.outboundTransportActual);
+    const returning = validFare(trip.returnTransportActual);
+    if (outbound === null || returning === null) {
+      return NextResponse.json({ error: "방향별 운임은 0원 이상 1,000만 원 이하의 숫자로 입력해 주세요." }, { status: 400 });
+    }
+    trip.outboundTransportActual = outbound;
+    trip.returnTransportActual = returning;
+    trip.transportActual = outbound + returning;
+    const participantAmountError = participantAmountValidationError(trip);
+    if (participantAmountError) return NextResponse.json({ error: participantAmountError }, { status: 400 });
+    const routeError = tripRouteValidationError(trip);
+    if (routeError) return NextResponse.json({ error: routeError }, { status: 400 });
+    expense = calculateTripExpense(trip);
+    trip.expense = expense;
+  }
+
+  let { data: existing, error: existingError } = await client
     .from("travel_trips")
-    .select("source_object_key,payload_json")
+    .select("id,status,total_amount,source_object_key,payload_json")
     .eq("id", tripId)
     .eq("user_id", user.id)
     .maybeSingle();
   if (existingError) return NextResponse.json({ error: "기존 출장 서류를 확인하지 못했습니다." }, { status: 500 });
 
+  if (registerApproved && !existing && String(trip.documentNumber || "").trim()) {
+    const duplicateLookup = await client
+      .from("travel_trips")
+      .select("id,status,total_amount,source_object_key,payload_json")
+      .eq("user_id", user.id)
+      .eq("document_number", String(trip.documentNumber).trim())
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (duplicateLookup.error) return NextResponse.json({ error: "같은 승인 출장 기록을 확인하지 못했습니다." }, { status: 500 });
+    if (duplicateLookup.data) {
+      existing = duplicateLookup.data;
+      tripId = existing.id;
+      trip.id = tripId;
+    }
+  }
+
+  const alreadyCompleted = isTravelRecordCompleted(existing);
+  if (registerApproved && alreadyCompleted && existing?.payload_json) {
+    trip = { ...trip, ...existing.payload_json, id: tripId };
+    expense = trip.expense && typeof trip.expense === "object"
+      ? trip.expense
+      : { total: Number(existing.total_amount) || 0 };
+  }
+
+  const prefix = sourcePrefix(user.id, tripId);
   let previousDocuments;
   try {
     previousDocuments = storedSourceDocuments(existing?.payload_json, existing?.source_object_key, prefix);
@@ -333,17 +376,20 @@ export async function POST(request) {
     || nextDocuments.sourceHwpx?.objectKey
     || null;
   const now = new Date().toISOString();
+  const status = registerApproved && !alreadyCompleted
+    ? TRAVEL_RECORD_STATUS.approved
+    : TRAVEL_RECORD_STATUS.completed;
   const row = {
     id: tripId,
     user_id: user.id,
-    status: "saved",
+    status,
     document_number: trip.documentNumber || null,
     department: trip.department || null,
     employee_name: trip.employeeName || null,
     purpose: trip.purpose || null,
     destination: trip.destination || null,
-    start_at: trip.startAt || null,
-    end_at: trip.endAt || null,
+    start_at: safeTravelTimestamp(trip.startAt),
+    end_at: safeTravelTimestamp(trip.endAt),
     transport_type: trip.transportType || null,
     project_type: trip.projectType || null,
     total_amount: expense.total || 0,
@@ -374,8 +420,10 @@ export async function POST(request) {
   }
 
   return NextResponse.json({
-    trip: summary(trip, expense, now, sourceObjectKey),
+    trip: summary(trip, expense, now, sourceObjectKey, status),
     duplicateWarnings: [],
+    registeredApproved: registerApproved,
+    alreadyCompleted,
     ...(sourceCleanupWarning ? { sourceCleanupWarning } : {}),
   });
 }

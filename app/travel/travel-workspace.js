@@ -31,6 +31,7 @@ import {
   tripTransportFares,
 } from "@/lib/travel-rules";
 import { initialReportApprovalLine, initialTripOrigin, reportApprovalLineForDocument } from "@/lib/travel-user-preferences";
+import { filterTravelRecords, isTravelRecordCompleted, travelRecordCounts } from "@/lib/travel-ledger";
 import styles from "./travel.module.css";
 
 const KRW = new Intl.NumberFormat("ko-KR", { maximumFractionDigits: 0 });
@@ -499,6 +500,7 @@ export default function TravelWorkspace({ user, defaultOrigin, defaultReportAppr
   const [sourceHwpxPending, setSourceHwpxPending] = useState(false);
   const [sourceMismatch, setSourceMismatch] = useState("");
   const [recentTrips, setRecentTrips] = useState([]);
+  const [ledgerFilter, setLedgerFilter] = useState("all");
   const [farePresets, setFarePresets] = useState([]);
   const [fareOptions, setFareOptions] = useState([]);
   const [fareDirection, setFareDirection] = useState("outbound");
@@ -516,6 +518,8 @@ export default function TravelWorkspace({ user, defaultOrigin, defaultReportAppr
   const hwpxInputRef = useRef(null);
   const parseRequestRef = useRef(0);
   const expense = useMemo(() => calculateTripExpense(trip), [trip]);
+  const ledgerCounts = useMemo(() => travelRecordCounts(recentTrips), [recentTrips]);
+  const filteredTrips = useMemo(() => filterTravelRecords(recentTrips, ledgerFilter), [recentTrips, ledgerFilter]);
   const hasSourceDocument = Boolean(approvedPdfFile || sourceHwpxFile);
 
   useEffect(() => {
@@ -980,13 +984,14 @@ export default function TravelWorkspace({ user, defaultOrigin, defaultReportAppr
         transportActual: fareValue(appliedTrip.outboundTransportActual) + fareValue(appliedTrip.returnTransportActual),
       };
     }
-    setTrip({
+    const preparedTrip = {
       ...nextTrip,
       reportContent: buildRuleBasedTravelReport(nextTrip),
       reportContentSource: "rule",
       reportBasisKey: reportBasisKey(nextTrip),
       reportNeedsReview: false,
-    });
+    };
+    setTrip(preparedTrip);
     setAiProgress({ progress: 0, text: "" });
     const participantNotice = parsed.participants?.length > 1 ? ` 출장자 ${parsed.participants.length}명을 분리했습니다.` : "";
     const fareNoticeText = !nextTrip.origin
@@ -1001,8 +1006,31 @@ export default function TravelWorkspace({ user, defaultOrigin, defaultReportAppr
     const missingNotice = parsed.missing.length
       ? `${parsed.missing.join(", ")} 항목은 직접 확인해 주세요.`
       : `${sourceLabel}에서 승인서 주요 항목을 모두 읽었습니다.`;
-    setNotice(`${missingNotice}${participantNotice}${fareNoticeText}${extraNotice}`);
+    const nextNotice = `${missingNotice}${participantNotice}${fareNoticeText}${extraNotice}`;
+    setNotice(nextNotice);
     setActiveSection("review");
+    return { trip: preparedTrip, notice: nextNotice };
+  }
+
+  async function registerApprovedTrip(tripForRecord, files) {
+    const formData = new FormData();
+    const cleanTrip = { ...tripForRecord };
+    delete cleanTrip.parsedText;
+    formData.set("trip", JSON.stringify(cleanTrip));
+    formData.set("intent", "register-approved");
+    if (files.approvedPdf) formData.set("approvedPdf", files.approvedPdf);
+    if (files.sourceHwpx) formData.set("sourceHwpx", files.sourceHwpx);
+
+    const response = await fetch("/api/travel/trips", { method: "POST", body: formData });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || "승인 출장대장에 자동 등록하지 못했습니다.");
+    if (data.trip?.id && data.trip.id !== tripForRecord.id) {
+      setTrip((current) => current.id === tripForRecord.id ? { ...current, id: data.trip.id } : current);
+    }
+    if (files.approvedPdf) setApprovedPdfPending(false);
+    if (files.sourceHwpx) setSourceHwpxPending(false);
+    setRecentTrips((current) => [data.trip, ...current.filter((item) => item.id !== data.trip.id)].slice(0, 200));
+    return data;
   }
 
   async function readTravelFiles(fileList) {
@@ -1135,7 +1163,18 @@ export default function TravelWorkspace({ user, defaultOrigin, defaultReportAppr
         : hwpxError
           ? ` HWPX는 읽지 못해 PDF 결과를 사용했습니다: ${hwpxError}`
           : "";
-      await applyParsedTravel(parsed, hwpxParsed ? "원본 HWPX 표" : "승인 PDF", extraNotice, requestId);
+      const applied = await applyParsedTravel(parsed, hwpxParsed ? "원본 HWPX 표" : "승인 PDF", extraNotice, requestId);
+      if (!mismatch && applied && parseRequestRef.current === requestId) {
+        try {
+          const registered = await registerApprovedTrip(applied.trip, {
+            approvedPdf: selectedPdf && pdfParsed ? selectedPdf : null,
+            sourceHwpx: selectedHwpx && hwpxParsed ? selectedHwpx : null,
+          });
+          setNotice(`${applied.notice} ${registered.alreadyCompleted ? "이미 완료된 출장 기록의 원본을 보완했습니다." : "승인 출장대장에 ‘작성 필요’로 자동 등록했습니다."}`);
+        } catch (registrationError) {
+          setNotice(`${applied.notice} 출장대장 자동 등록은 실패했습니다: ${registrationError instanceof Error ? registrationError.message : "잠시 후 다시 시도해 주세요."}`);
+        }
+      }
     } catch (error) {
       if (parseRequestRef.current === requestId) setNotice(error instanceof Error ? error.message : "승인 문서를 읽지 못했습니다.");
     } finally {
@@ -1168,7 +1207,7 @@ export default function TravelWorkspace({ user, defaultOrigin, defaultReportAppr
           : "출장 서류와 첨부한 원본 문서를 안전하게 저장했습니다.");
       setApprovedPdfPending(false);
       setSourceHwpxPending(false);
-      setRecentTrips((current) => [data.trip, ...current.filter((item) => item.id !== data.trip.id)].slice(0, 12));
+      setRecentTrips((current) => [data.trip, ...current.filter((item) => item.id !== data.trip.id)].slice(0, 200));
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "저장하지 못했습니다.");
     } finally {
@@ -1211,6 +1250,43 @@ export default function TravelWorkspace({ user, defaultOrigin, defaultReportAppr
     } finally {
       setBusy("");
     }
+  }
+
+  function loadTripFromLedger(item) {
+    if (!item?.payload || typeof item.payload !== "object") {
+      setNotice("이 출장 기록은 이전 버전에서 저장되어 화면으로 불러올 수 없습니다. 목록 정보는 계속 확인할 수 있습니다.");
+      return;
+    }
+    const base = blankTrip(user, defaultOrigin, defaultReportApprovalLine);
+    const participants = Array.isArray(item.payload.participants) && item.payload.participants.length
+      ? item.payload.participants.map((participant) => newParticipant(participant))
+      : base.participants;
+    const loaded = {
+      ...base,
+      ...item.payload,
+      id: item.id,
+      participants,
+      reporterParticipantId: participants.some((participant) => participant.id === item.payload.reporterParticipantId)
+        ? item.payload.reporterParticipantId
+        : participants[0].id,
+      missing: Array.isArray(item.payload.missing) ? item.payload.missing : parsedTravelMissing(item.payload),
+    };
+    setTrip(loaded);
+    setApprovedPdfFile(null);
+    setSourceHwpxFile(null);
+    setApprovedPdfPending(false);
+    setSourceHwpxPending(false);
+    setSourceMismatch("");
+    if (pdfInputRef.current) pdfInputRef.current.value = "";
+    if (hwpxInputRef.current) hwpxInputRef.current.value = "";
+    setFareOptions([]);
+    setFareNotice("");
+    setAiProgress({ progress: 0, text: "" });
+    setActiveSection("review");
+    setNotice(isTravelRecordCompleted(item)
+      ? "완료된 출장 서류를 불러왔습니다. 수정 후 다시 저장하면 같은 기록에 반영됩니다."
+      : "작성 필요한 승인 출장을 불러왔습니다. 원본은 안전하게 보관 중이므로 다시 선택하지 않아도 됩니다.");
+    document.getElementById("workspace")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
   async function downloadExcel() {
@@ -1394,7 +1470,7 @@ export default function TravelWorkspace({ user, defaultOrigin, defaultReportAppr
               <button type="button" onClick={() => hwpxInputRef.current?.click()} disabled={Boolean(busy)}>{sourceHwpxFile ? "HWPX 교체" : "HWPX 선택"}</button>
             </article>
           </div>
-          <p className={styles.uploadHint}>{busy === "parse" ? "문서를 읽는 중입니다…" : "PDF는 브라우저에서, HWPX는 정확도를 높이기 위해 로그인한 앱 서버의 Kordoc에서도 일시 분석합니다. 저장 전에는 원본을 보관하지 않으며 두 파일 합계는 최대 4MB입니다."}</p>
+          <p className={styles.uploadHint}>{busy === "parse" ? "문서를 읽고 승인 출장대장에 등록하는 중입니다…" : "PDF는 브라우저에서, HWPX는 정확도를 높이기 위해 로그인한 앱 서버의 Kordoc에서도 일시 분석합니다. 추출에 성공하면 누락 점검을 위해 원본과 출장 정보가 내 출장대장에 자동 등록되며 두 파일 합계는 최대 4MB입니다."}</p>
         </div>
       </section>
 
@@ -1561,8 +1637,31 @@ export default function TravelWorkspace({ user, defaultOrigin, defaultReportAppr
       </section>
 
       <section id="recent" className={styles.recentSection}>
-        <div><p className={styles.eyebrow}>MY BUSINESS TRIPS</p><h2>내 출장 서류</h2><span>저장한 출장만 본인 계정에서 다시 볼 수 있습니다.</span></div>
-        <div className={styles.recentList}>{recentTrips.length ? recentTrips.map((item) => <article key={item.id}><div><strong>{item.destination || "출장지 미입력"}</strong><span>{item.purpose || "출장목적 미입력"}{item.participant_count > 1 ? ` · ${item.participant_count}명 동반` : ""}</span></div><small>{String(item.start_at || "").slice(0, 10)}</small><b>{money(item.total_amount)}</b><button className={styles.deleteTripButton} type="button" onClick={() => deleteTrip(item)} disabled={Boolean(busy)} aria-label={`${String(item.start_at || "").slice(0, 10)} ${item.destination || "출장지 미입력"} 출장 삭제`}>{busy === `delete-${item.id}` ? "삭제 중…" : "삭제"}</button></article>) : <div className={styles.emptyRecent}>아직 저장한 출장 서류가 없습니다.</div>}</div>
+        <div><p className={styles.eyebrow}>MY BUSINESS TRIP LEDGER</p><h2>내 출장대장 · 누락 점검</h2><span>승인서 업로드 건과 서류 완료 건을 한눈에 비교합니다.</span></div>
+        <div className={styles.ledgerSummary} aria-label="출장대장 집계">
+          <div><span>전체 등록</span><strong>{ledgerCounts.total}건</strong></div>
+          <div className={ledgerCounts.pending ? styles.ledgerPending : ""}><span>작성 필요</span><strong>{ledgerCounts.pending}건</strong></div>
+          <div><span>서류 완료</span><strong>{ledgerCounts.completed}건</strong></div>
+        </div>
+        <div className={styles.ledgerToolbar}>
+          <div role="group" aria-label="출장대장 상태 필터">
+            {[["all", "전체"], ["pending", "작성 필요"], ["completed", "완료"]].map(([value, label]) => (
+              <button key={value} type="button" className={ledgerFilter === value ? styles.ledgerFilterActive : ""} onClick={() => setLedgerFilter(value)}>{label}</button>
+            ))}
+          </div>
+          <p>앱에 한 번이라도 올린 승인서 기준입니다. 전자결재에만 있고 앱에 올리지 않은 건은 향후 전자결재 목록 엑셀 대조가 필요합니다.</p>
+        </div>
+        <div className={styles.recentList}>{filteredTrips.length ? filteredTrips.map((item) => {
+          const completed = isTravelRecordCompleted(item);
+          return <article key={item.id}>
+            <div><strong>{item.destination || "출장지 확인 필요"}</strong><span>{item.purpose || "출장목적 확인 필요"}{item.participant_count > 1 ? ` · ${item.participant_count}명 동반` : ""}</span></div>
+            <small>{String(item.start_at || "").slice(0, 10) || "날짜 확인 필요"}</small>
+            <span className={`${styles.ledgerStatus} ${completed ? styles.ledgerStatusComplete : styles.ledgerStatusPending}`}>{completed ? "서류 완료" : "작성 필요"}</span>
+            <b>{completed ? money(item.total_amount) : "-"}</b>
+            <button className={styles.loadTripButton} type="button" onClick={() => loadTripFromLedger(item)} disabled={Boolean(busy)}>불러오기</button>
+            <button className={styles.deleteTripButton} type="button" onClick={() => deleteTrip(item)} disabled={Boolean(busy)} aria-label={`${String(item.start_at || "").slice(0, 10)} ${item.destination || "출장지 미입력"} 출장 삭제`}>{busy === `delete-${item.id}` ? "삭제 중…" : "삭제"}</button>
+          </article>;
+        }) : <div className={styles.emptyRecent}>{recentTrips.length ? "선택한 상태의 출장 기록이 없습니다." : "승인 PDF 또는 HWPX를 올리면 출장대장에 자동 등록됩니다."}</div>}</div>
       </section>
 
       <section id="policy" className={styles.policySection}>

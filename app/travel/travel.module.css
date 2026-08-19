@@ -283,12 +283,28 @@
 .recentSection, .policySection { width: min(1320px, calc(100% - 64px)); margin: 0 auto 70px; }
 .recentSection > div:first-child h2, .policySection h2 { margin: 0; font-size: 31px; letter-spacing: -.045em; }
 .recentSection > div:first-child > span { display: block; margin-top: 8px; color: var(--muted); font-size: 14px; }
+.ledgerSummary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 22px; }
+.ledgerSummary > div { padding: 16px 18px; border: 1px solid var(--line); border-radius: 13px; background: rgba(255,255,255,.86); }
+.ledgerSummary span, .ledgerSummary strong { display: block; }
+.ledgerSummary span { color: var(--muted); font-size: 12px; font-weight: 800; }
+.ledgerSummary strong { margin-top: 5px; font-size: 21px; }
+.ledgerSummary .ledgerPending { border-color: #efc86f; background: #fff8e8; }
+.ledgerToolbar { display: flex; gap: 18px; align-items: center; justify-content: space-between; margin-top: 12px; }
+.ledgerToolbar > div { display: flex; gap: 6px; flex: 0 0 auto; }
+.ledgerToolbar button { min-height: 38px; padding: 0 13px; border: 1px solid var(--line); border-radius: 999px; background: #fff; color: #5d6879; font-size: 12px; font-weight: 900; }
+.ledgerToolbar .ledgerFilterActive { border-color: #2c5fc8; background: #2c5fc8; color: #fff; }
+.ledgerToolbar p { margin: 0; color: #6c7584; font-size: 12px; line-height: 1.55; text-align: right; }
 .recentList { display: grid; gap: 8px; margin-top: 21px; }
-.recentList article { display: grid; grid-template-columns: minmax(0, 1fr) 110px 110px 64px; gap: 10px; align-items: center; min-height: 70px; padding: 12px 18px; border: 1px solid var(--line); border-radius: 13px; background: rgba(255,255,255,.84); }
+.recentList article { display: grid; grid-template-columns: minmax(0, 1fr) 105px 88px 105px 72px 64px; gap: 10px; align-items: center; min-height: 70px; padding: 12px 18px; border: 1px solid var(--line); border-radius: 13px; background: rgba(255,255,255,.84); }
 .recentList article strong, .recentList article span { display: block; }
 .recentList article strong { font-size: 14px; }
 .recentList article span, .recentList article small { margin-top: 4px; color: var(--muted); font-size: 12px; }
 .recentList article b { font-size: 14px; text-align: right; }
+.recentList article .ledgerStatus { width: fit-content; margin: 0; padding: 5px 8px; border-radius: 999px; font-size: 11px; font-weight: 900; white-space: nowrap; }
+.recentList article .ledgerStatusPending { background: #fff0c8; color: #855f08; }
+.recentList article .ledgerStatusComplete { background: #e5f5ec; color: #187247; }
+.travelApp .loadTripButton { min-height: 38px; padding: 0 10px; border: 1px solid #b9ccee; border-radius: 8px; background: #f1f6ff; color: #2858aa; font-size: 12px; font-weight: 900; white-space: nowrap; }
+.travelApp .loadTripButton:hover:not(:disabled) { border-color: #7299dc; background: #e5efff; }
 .travelApp .deleteTripButton { min-height: 38px; padding: 0 10px; border: 1px solid #e4c9c5; border-radius: 8px; background: #fff7f5; color: #a1493f; font-size: 12px; font-weight: 900; white-space: nowrap; }
 .travelApp .deleteTripButton:hover:not(:disabled) { border-color: #c98278; background: #fceae7; }
 .emptyRecent { padding: 35px; border: 1px dashed #c4c9d0; border-radius: 13px; color: #7f8794; font-size: 14px; text-align: center; }
@@ -414,10 +430,17 @@
   .participantInputs input, .participantExpenseInputs input, .ollamaControls select { font-size: 16px; }
   .fieldWide, .amountCardAccent { grid-column: auto; }
   .checkRow { flex-wrap: wrap; }
+  .ledgerSummary { grid-template-columns: 1fr; }
+  .ledgerToolbar { align-items: stretch; flex-direction: column; }
+  .ledgerToolbar > div { display: grid; grid-template-columns: repeat(3, 1fr); }
+  .ledgerToolbar p { text-align: left; }
   .recentList article { grid-template-columns: minmax(0, 1fr) auto; }
-  .recentList article small { grid-column: 1; }
-  .recentList article b { grid-column: 2; grid-row: 1; }
-  .recentList article .deleteTripButton { grid-column: 2; grid-row: 2; }
+  .recentList article > div:first-child { grid-column: 1 / -1; }
+  .recentList article small { grid-column: 1; grid-row: 2; }
+  .recentList article .ledgerStatus { grid-column: 2; grid-row: 2; justify-self: end; }
+  .recentList article b { grid-column: 1 / -1; grid-row: 3; text-align: left; }
+  .recentList article .loadTripButton { grid-column: 1; grid-row: 4; }
+  .recentList article .deleteTripButton { grid-column: 2; grid-row: 4; }
 }
 
 @media print {
