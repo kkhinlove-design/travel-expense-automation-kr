@@ -64,6 +64,8 @@ export default function AdminPage() {
   const [fareRows, setFareRows] = useState([]);
   const [fareFileName, setFareFileName] = useState("");
   const [fareBusy, setFareBusy] = useState(false);
+  const [fareSourceBusy, setFareSourceBusy] = useState(false);
+  const [fareSourceUrl, setFareSourceUrl] = useState("");
   const [fareMessage, setFareMessage] = useState("");
   const [fareError, setFareError] = useState("");
   const [managedUsers, setManagedUsers] = useState([]);
@@ -230,6 +232,7 @@ export default function AdminPage() {
     event.target.value = "";
     setFareRows([]);
     setFareFileName(file?.name || "");
+    setFareSourceUrl("");
     setFareMessage("");
     setFareError("");
     if (!file) return;
@@ -242,6 +245,36 @@ export default function AdminPage() {
     } catch (fileError) {
       setFareFileName("");
       setFareError(fileError instanceof Error ? fileError.message : "운임 파일을 읽지 못했습니다.");
+    }
+  }
+
+  async function loadGoogleFareSource() {
+    setFareSourceBusy(true);
+    setFareRows([]);
+    setFareFileName("");
+    setFareSourceUrl("");
+    setFareMessage("");
+    setFareError("");
+    try {
+      const response = await fetch("/api/admin/fare-source", { cache: "no-store" });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data?.error || "Google 운임 시트를 불러오지 못했습니다.");
+      const rows = Array.isArray(data?.rows) ? data.rows : [];
+      if (!rows.length) throw new Error("Google 운임 시트에 적용할 노선이 없습니다.");
+      setFareRows(rows);
+      setFareFileName(data.sourceName || "Google 운임 시트");
+      setFareSourceUrl(data.sourceUrl || "");
+      const alternatives = Number(data.alternativeCount) || 0;
+      const reversePairs = Number(data.reversePairCount) || 0;
+      setFareMessage(
+        `원본 ${Number(data.sourceRowCount) || rows.length}건에서 ${rows.length}개 노선을 불러왔습니다.`
+        + (alternatives ? ` 우선 등급 외 대체 요금 ${alternatives}건은 제외했습니다.` : "")
+        + (reversePairs ? ` 왕복 방향별 요금 ${reversePairs}개 노선을 연결했습니다.` : ""),
+      );
+    } catch (sourceError) {
+      setFareError(sourceError instanceof Error ? sourceError.message : "Google 운임 시트를 불러오지 못했습니다.");
+    } finally {
+      setFareSourceBusy(false);
     }
   }
 
@@ -258,6 +291,7 @@ export default function AdminPage() {
       setFareMessage(`공용 기준표 ${data.total}개 노선을 반영했습니다. 신규 ${data.created}개 · 수정 ${data.updated}개`);
       setFareRows([]);
       setFareFileName("");
+      setFareSourceUrl("");
     }
     setFareBusy(false);
   }
@@ -392,20 +426,22 @@ export default function AdminPage() {
       <section id="fare-settings" style={{ width: "min(100%, 720px)", boxSizing: "border-box", padding: 32, borderRadius: 18, background: "#fff", boxShadow: "0 14px 50px #1d2b4418" }}>
         <p style={{ margin: "0 0 6px", color: "#2359ad", fontSize: 13, fontWeight: 800, letterSpacing: ".08em" }}>운임 설정</p>
         <h2 style={{ margin: 0 }}>공용 대중교통 운임 기준표</h2>
-        <p style={{ color: "#667085", lineHeight: 1.6 }}>관리자가 올린 노선만 전 직원의 자동 운임 계산에 적용됩니다. 직원 화면에서는 기준표를 조회·수정할 수 없으며, 같은 노선을 다시 올리면 새 금액으로 교체되고 파일에 빠진 기존 노선은 안전하게 보존됩니다.</p>
+        <p style={{ color: "#667085", lineHeight: 1.6 }}>관리자가 확인해 반영한 노선만 전 직원의 자동 운임 계산에 적용됩니다. 출장의 출발지→도착지 노선을 먼저 찾고, 정방향이 없을 때만 도착지→출발지 노선의 가는 길·오는 길 금액을 뒤집어 사용합니다.</p>
+        <p style={{ margin: "10px 0 0", color: "#475467", lineHeight: 1.6, fontSize: 14 }}>Google 시트에 같은 노선의 등급이 여러 개면 <strong>우등 → 일반 → 프리미엄</strong> 순으로 한 건을 선택합니다. 시트 또는 Excel에서 빠진 기존 공용 노선은 삭제하지 않습니다.</p>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 18 }}>
+          <button type="button" onClick={loadGoogleFareSource} disabled={fareSourceBusy || fareBusy} style={{ padding: "11px 14px", border: 0, borderRadius: 8, background: "#16805b", color: "#fff", fontWeight: 700, cursor: fareSourceBusy || fareBusy ? "wait" : "pointer" }}>{fareSourceBusy ? "Google 시트 읽는 중…" : "Google 시트에서 불러오기"}</button>
           <a href="/templates/travel-fare-import-template.xlsx" download style={{ display: "inline-flex", alignItems: "center", padding: "11px 14px", border: "1px solid #b9c7dc", borderRadius: 8, background: "#f5f8fc", color: "#214b8e", fontWeight: 700, textDecoration: "none" }}>공용 운임 양식 다운로드</a>
-          <label style={{ display: "inline-flex", alignItems: "center", padding: "11px 14px", borderRadius: 8, background: "#214b8e", color: "#fff", fontWeight: 700, cursor: "pointer" }}>
+          <label style={{ display: "inline-flex", alignItems: "center", padding: "11px 14px", borderRadius: 8, background: "#214b8e", color: "#fff", fontWeight: 700, cursor: fareSourceBusy || fareBusy ? "not-allowed" : "pointer", opacity: fareSourceBusy || fareBusy ? 0.6 : 1 }}>
             공용 운임 파일 선택
-            <input type="file" accept=".xlsx,.xls,.csv" onChange={readFareFile} hidden />
+            <input type="file" accept=".xlsx,.xls,.csv" onChange={readFareFile} disabled={fareSourceBusy || fareBusy} hidden />
           </label>
         </div>
-        {fareFileName ? <p style={{ margin: "14px 0 0", color: "#475467" }}>선택한 파일: {fareFileName} · {fareRows.length}개 노선 확인</p> : null}
+        {fareFileName ? <p style={{ margin: "14px 0 0", color: "#475467" }}>선택한 자료: {fareFileName} · {fareRows.length}개 노선 확인{fareSourceUrl ? <> · <a href={fareSourceUrl} target="_blank" rel="noreferrer" style={{ color: "#2359ad" }}>원본 시트 열기</a></> : null}</p> : null}
         {fareRows.length ? <>
           <div style={{ maxHeight: 220, overflow: "auto", marginTop: 14, border: "1px solid #e4e7ec", borderRadius: 9 }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}><thead><tr style={{ background: "#f8fafc" }}><th style={{ padding: 9, textAlign: "left" }}>출발지</th><th style={{ padding: 9, textAlign: "left" }}>도착지</th><th style={{ padding: 9, textAlign: "right" }}>가는 길</th><th style={{ padding: 9, textAlign: "right" }}>오는 길</th></tr></thead><tbody>{fareRows.slice(0, 100).map((row) => <tr key={`${row.origin}-${row.destination}`}><td style={{ padding: 9, borderTop: "1px solid #eef1f5" }}>{row.origin}</td><td style={{ padding: 9, borderTop: "1px solid #eef1f5" }}>{row.destination}</td><td style={{ padding: 9, borderTop: "1px solid #eef1f5", textAlign: "right" }}>{row.outboundFare.toLocaleString()}원</td><td style={{ padding: 9, borderTop: "1px solid #eef1f5", textAlign: "right" }}>{row.returnFare.toLocaleString()}원</td></tr>)}</tbody></table>
+            <table style={{ width: "100%", minWidth: 680, borderCollapse: "collapse", fontSize: 14 }}><thead><tr style={{ background: "#f8fafc" }}><th style={{ padding: 9, textAlign: "left" }}>출발지</th><th style={{ padding: 9, textAlign: "left" }}>도착지</th><th style={{ padding: 9, textAlign: "right" }}>가는 길</th><th style={{ padding: 9, textAlign: "right" }}>오는 길</th><th style={{ padding: 9, textAlign: "left" }}>선택 기준</th></tr></thead><tbody>{fareRows.slice(0, 100).map((row) => <tr key={`${row.origin}-${row.destination}`}><td style={{ padding: 9, borderTop: "1px solid #eef1f5" }}>{row.origin}</td><td style={{ padding: 9, borderTop: "1px solid #eef1f5" }}>{row.destination}</td><td style={{ padding: 9, borderTop: "1px solid #eef1f5", textAlign: "right" }}>{row.outboundFare.toLocaleString()}원</td><td style={{ padding: 9, borderTop: "1px solid #eef1f5", textAlign: "right" }}>{row.returnFare.toLocaleString()}원</td><td style={{ padding: 9, borderTop: "1px solid #eef1f5", color: "#475467" }}>{row.sourceGrade || "직접 등록"}{row.sourceRouteType ? ` · ${row.sourceRouteType}` : ""}</td></tr>)}</tbody></table>
           </div>
-          <button type="button" onClick={submitFareCatalog} disabled={fareBusy} style={{ width: "100%", marginTop: 16, padding: 13, border: 0, borderRadius: 8, background: "#16805b", color: "#fff", fontWeight: 700 }}>{fareBusy ? "공용 기준표 업로드 중…" : `${fareRows.length}개 노선을 공용 기준표로 반영`}</button>
+          <button type="button" onClick={submitFareCatalog} disabled={fareBusy || fareSourceBusy} style={{ width: "100%", marginTop: 16, padding: 13, border: 0, borderRadius: 8, background: "#16805b", color: "#fff", fontWeight: 700 }}>{fareBusy ? "공용 기준표 업로드 중…" : `${fareRows.length}개 노선을 공용 기준표로 반영`}</button>
         </> : null}
         {fareMessage ? <p style={{ color: "#16704f", lineHeight: 1.6 }}>{fareMessage}</p> : null}
         {fareError ? <p role="alert" style={{ color: "#b42318", lineHeight: 1.6 }}>{fareError}</p> : null}
