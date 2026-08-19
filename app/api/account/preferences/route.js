@@ -45,6 +45,7 @@ export async function PUT(request) {
     preference: {
       defaultOrigin: data.default_origin,
       reportApprovalLine: [data.report_approver_first, data.report_approver_second],
+      configured: true,
       updatedAt: data.updated_at,
     },
   });

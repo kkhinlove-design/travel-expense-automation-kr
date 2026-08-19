@@ -12,6 +12,8 @@ export default function AccountPasswordForm({
   initialReportApprovalLine,
   preferenceWritable,
   preferenceLoadError,
+  setupRequired,
+  returnTo,
 }) {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -30,7 +32,7 @@ export default function AccountPasswordForm({
     setPreferenceMessage("");
     setPreferenceError("");
     if (!defaultOrigin) {
-      setPreferenceError("기본 출발 사무소를 선택해 주세요.");
+      setPreferenceError("기본 출발 기준지를 선택해 주세요.");
       return;
     }
     if (reportApprovalLine.some((title) => !title)) {
@@ -52,7 +54,8 @@ export default function AccountPasswordForm({
       if (!response.ok) throw new Error(data.error || "출장 환경 설정을 저장하지 못했습니다.");
       setDefaultOrigin(data.preference.defaultOrigin);
       setReportApprovalLine(data.preference.reportApprovalLine);
-      setPreferenceMessage(`${data.preference.defaultOrigin} 사무소와 ${data.preference.reportApprovalLine.join(" → ")} 결재라인을 저장했습니다.`);
+      setPreferenceMessage(`${data.preference.defaultOrigin} 기준지와 ${data.preference.reportApprovalLine.join(" → ")} 결재라인을 저장했습니다.`);
+      if (setupRequired) window.location.assign(returnTo || "/travel");
     } catch (submitError) {
       setPreferenceError(submitError instanceof Error ? submitError.message : "출장 환경 설정을 저장하지 못했습니다.");
     } finally {
@@ -120,17 +123,18 @@ export default function AccountPasswordForm({
           <p style={{ margin: 0, color: "#667085", fontSize: 13, fontWeight: 800, letterSpacing: "0.12em" }}>MY ACCOUNT</p>
           <h1 style={{ margin: "10px 0 8px", color: "#172033" }}>내 환경 설정</h1>
           <p style={{ margin: 0, color: "#667085", lineHeight: 1.6 }}>출장 기본값과 로그인 비밀번호를 관리합니다.</p>
+          {setupRequired ? <div role="status" style={{ marginTop: 18, padding: "14px 16px", border: "1px solid #a9c4ef", borderRadius: 10, background: "#eef5ff", color: "#214b8e", lineHeight: 1.65 }}><strong>첫 사용 환경 설정</strong><br />출장서류를 시작하기 전에 출발 기준지와 복명서 결재라인을 저장해 주세요.</div> : null}
           <div style={{ marginTop: 20, padding: "12px 14px", borderRadius: 9, background: "#f5f8fc", color: "#475467", fontSize: 14 }}>
             <strong>{user.displayName || user.email}</strong><br />{user.email}
           </div>
 
           <form onSubmit={submitPreference} style={{ marginTop: 24, padding: 18, border: "1px solid #d9e2ef", borderRadius: 12, background: "#f8faff" }}>
             <h2 style={{ margin: 0, color: "#172033", fontSize: 19 }}>출장 기본값</h2>
-            <p style={{ margin: "7px 0 14px", color: "#667085", fontSize: 14, lineHeight: 1.6 }}>새 출장을 시작할 때 출발 사무소와 복명서 결재라인에 자동 적용됩니다.</p>
+            <p style={{ margin: "7px 0 14px", color: "#667085", fontSize: 14, lineHeight: 1.6 }}>새 출장을 시작할 때 출발 기준지와 복명서 결재라인에 자동 적용됩니다.</p>
             <label htmlFor="default-origin" style={{ display: "block", marginBottom: 8, fontWeight: 700 }}>출발 기준지</label>
             <select id="default-origin" value={defaultOrigin} onChange={(event) => setDefaultOrigin(event.target.value)} disabled={!preferenceWritable || preferenceBusy} style={{ width: "100%", minWidth: 0, minHeight: 46, padding: "0 12px", border: "1px solid #b9c7dc", borderRadius: 8, background: "#fff" }}>
-              <option value="">기본 출발 사무소 선택</option>
-              {originBases.map((origin) => <option key={origin} value={origin}>{origin} 사무소</option>)}
+              <option value="">기본 출발 기준지 선택</option>
+              {originBases.map((origin) => <option key={origin} value={origin}>{origin}</option>)}
             </select>
             <fieldset style={{ margin: "18px 0 0", padding: 0, border: 0 }}>
               <legend style={{ marginBottom: 8, fontWeight: 700 }}>출장복명서 결재라인</legend>
@@ -142,14 +146,14 @@ export default function AccountPasswordForm({
               <p style={{ margin: "8px 0 0", color: "#667085", fontSize: 13, lineHeight: 1.6 }}>기존 2칸 결재 양식을 유지하고 직위만 바꿉니다.</p>
             </fieldset>
             <div style={{ marginTop: 16 }}>
-              <button type="submit" disabled={!preferenceWritable || preferenceBusy} style={{ width: "100%", minHeight: 46, padding: "0 18px", border: 0, borderRadius: 8, background: "#214b8e", color: "#fff", fontWeight: 700 }}>{preferenceBusy ? "저장 중…" : "출장 기본값 저장"}</button>
+              <button type="submit" disabled={!preferenceWritable || preferenceBusy} style={{ width: "100%", minHeight: 46, padding: "0 18px", border: 0, borderRadius: 8, background: "#214b8e", color: "#fff", fontWeight: 700 }}>{preferenceBusy ? "저장 중…" : setupRequired ? "저장하고 출장 시작" : "출장 기본값 저장"}</button>
             </div>
             {!preferenceWritable ? <p style={{ margin: "12px 0 0", color: "#667085", fontSize: 13, lineHeight: 1.6 }}>{preferenceLoadError ? "저장된 값을 다시 불러온 뒤 수정해 주세요." : "로컬 미리보기에서는 저장되지 않습니다. 로그인한 운영 사이트에서 설정해 주세요."}</p> : null}
             {preferenceMessage ? <p role="status" style={{ margin: "12px 0 0", color: "#16704f", lineHeight: 1.6 }}>{preferenceMessage}</p> : null}
             {preferenceError ? <p role="alert" style={{ margin: "12px 0 0", color: "#b42318", lineHeight: 1.6 }}>{preferenceError}</p> : null}
           </form>
 
-          <div style={{ height: 1, margin: "28px 0 24px", background: "#e6e9ee" }} />
+          {!setupRequired ? <><div style={{ height: 1, margin: "28px 0 24px", background: "#e6e9ee" }} />
           <form onSubmit={submit}>
             <h2 style={{ margin: 0, color: "#172033", fontSize: 19 }}>비밀번호 변경</h2>
             <p style={{ margin: "7px 0 0", color: "#667085", fontSize: 14, lineHeight: 1.6 }}>현재 비밀번호를 확인한 뒤 새 비밀번호로 변경합니다.</p>
@@ -162,10 +166,10 @@ export default function AccountPasswordForm({
             <button disabled={busy} style={{ width: "100%", padding: 13, border: 0, borderRadius: 8, background: "#172033", color: "#fff", fontWeight: 700 }}>{busy ? "변경 중…" : "비밀번호 변경"}</button>
             {message ? <p role="status" style={{ color: "#16704f", lineHeight: 1.6 }}>{message}</p> : null}
             {error ? <p role="alert" style={{ color: "#b42318", lineHeight: 1.6 }}>{error}</p> : null}
-          </form>
+          </form></> : null}
         </section>
         <div style={{ display: "flex", justifyContent: "space-between", gap: 12, marginTop: 14, padding: "0 4px" }}>
-          <a href="/travel" style={{ color: "#315895", fontSize: 14 }}>출장 화면으로 돌아가기</a>
+          {setupRequired ? <span style={{ color: "#667085", fontSize: 14 }}>환경설정 저장 후 출장 화면으로 이동합니다.</span> : <a href="/travel" style={{ color: "#315895", fontSize: 14 }}>출장 화면으로 돌아가기</a>}
           <a href={signOutPath} style={{ color: "#667085", fontSize: 14 }}>로그아웃</a>
         </div>
       </div>

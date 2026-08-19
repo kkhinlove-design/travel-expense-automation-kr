@@ -509,7 +509,7 @@ export default function TravelWorkspace({ user, defaultOrigin, defaultReportAppr
   const [aiProgress, setAiProgress] = useState({ progress: 0, text: "" });
   const [busy, setBusy] = useState("");
   const [notice, setNotice] = useState(() => defaultOrigin
-    ? `기본 출발지는 ${defaultOrigin} 사무소입니다. 승인 PDF 또는 원본 HWPX를 올려주세요.`
+    ? `기본 출발지는 ${defaultOrigin}입니다. 승인 PDF 또는 원본 HWPX를 올려주세요.`
     : "승인 PDF 또는 원본 HWPX를 올려주세요. 두 파일을 함께 올리면 HWPX 표를 우선 적용합니다.");
   const [activeSection, setActiveSection] = useState("review");
   const pdfInputRef = useRef(null);
@@ -595,14 +595,14 @@ export default function TravelWorkspace({ user, defaultOrigin, defaultReportAppr
   function updateOriginBase(value) {
     update("origin", value);
     setNotice(value
-      ? `${value} 사무소를 출발 기준지로 적용했습니다. 관리자 운임을 다시 확인합니다.`
-      : "실제 출장 출발 사무소를 선택해 주세요.");
+      ? `${value} 지역을 출발 기준지로 적용했습니다. 관리자 운임을 다시 확인합니다.`
+      : "실제 출장 출발 기준지를 선택해 주세요.");
   }
 
   function openExpenseSection() {
     const informationError = tripRequiredInformationValidationError(trip)
       || tripDateValidationError(trip.startAt, trip.endAt)
-      || (!String(trip.origin || "").trim() ? "실제 출장 출발 사무소를 선택해 주세요." : "");
+      || (!String(trip.origin || "").trim() ? "실제 출장 출발 기준지를 선택해 주세요." : "");
     if (informationError) {
       setNotice(informationError);
       setActiveSection("review");
@@ -614,7 +614,7 @@ export default function TravelWorkspace({ user, defaultOrigin, defaultReportAppr
   function openReportSection() {
     const informationError = tripRequiredInformationValidationError(trip)
       || tripDateValidationError(trip.startAt, trip.endAt)
-      || (!String(trip.origin || "").trim() ? "복명서 작성 전에 실제 출장 출발 사무소를 선택해 주세요." : "");
+      || (!String(trip.origin || "").trim() ? "복명서 작성 전에 실제 출장 출발 기준지를 선택해 주세요." : "");
     if (informationError) {
       setNotice(informationError);
       setActiveSection("review");
@@ -990,7 +990,7 @@ export default function TravelWorkspace({ user, defaultOrigin, defaultReportAppr
     setAiProgress({ progress: 0, text: "" });
     const participantNotice = parsed.participants?.length > 1 ? ` 출장자 ${parsed.participants.length}명을 분리했습니다.` : "";
     const fareNoticeText = !nextTrip.origin
-      ? " 실제 출장 출발 사무소를 선택하면 관리자 운임을 자동 적용합니다."
+      ? " 실제 출장 출발 기준지를 선택하면 관리자 운임을 자동 적용합니다."
         : automaticPreset
           ? ` 관리자 운임 ${automaticPreset.origin} → ${automaticPreset.destination} 왕복 ${money(tripTransportFares(nextTrip).total)}을 자동 적용했습니다.`
           : automaticMatch.ambiguous
@@ -1352,7 +1352,7 @@ export default function TravelWorkspace({ user, defaultOrigin, defaultReportAppr
     setFareNotice("");
     setAiProgress({ progress: 0, text: "" });
     setNotice(defaultOrigin
-      ? `새 출장의 기본 출발지를 ${defaultOrigin} 사무소로 적용했습니다.`
+      ? `새 출장의 기본 출발지를 ${defaultOrigin} 지역으로 적용했습니다.`
       : "새 출장신청 PDF 또는 HWPX를 올려주세요.");
   }
 
@@ -1429,10 +1429,10 @@ export default function TravelWorkspace({ user, defaultOrigin, defaultReportAppr
                 </div>
                 <Field label="출발 일시"><input type="datetime-local" value={trip.startAt} onChange={(event) => update("startAt", event.target.value)} /></Field>
                 <Field label="도착 일시"><input type="datetime-local" value={trip.endAt} onChange={(event) => update("endAt", event.target.value)} /></Field>
-                <Field label="출발 기준지(사무소)" hint="실제 출발 사무소를 선택하면 관리자 운임과 제출 서류에 동일하게 반영됩니다.">
+                <Field label="출발 기준지" hint="실제 출발 기준지를 선택하면 관리자 운임과 제출 서류에 동일하게 반영됩니다.">
                   <select value={trip.origin} onChange={(event) => updateOriginBase(event.target.value)}>
                     <option value="">출발 기준지 선택</option>
-                    {ORGANIZATION_CONFIG.originBases.map((origin) => <option key={origin} value={origin}>{origin} 사무소</option>)}
+                    {ORGANIZATION_CONFIG.originBases.map((origin) => <option key={origin} value={origin}>{origin}</option>)}
                     {trip.origin && !ORGANIZATION_CONFIG.originBases.includes(trip.origin) ? <option value={trip.origin}>{trip.origin} (기존 저장값)</option> : null}
                   </select>
                 </Field>

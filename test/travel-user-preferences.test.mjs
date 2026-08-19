@@ -9,6 +9,7 @@ import {
   initialTripOrigin,
   originPreferenceValidationError,
   reportApprovalLineForDocument,
+  travelUserPreferenceConfigured,
 } from "../lib/travel-user-preferences.js";
 
 const bases = ["전주", "군산", "부안"];
@@ -44,8 +45,8 @@ test("keeps a historical report approval line even when the current option list 
 });
 
 test("requires a configured departure office", () => {
-  assert.equal(originPreferenceValidationError("", bases), "기본 출발 사무소를 선택해 주세요.");
-  assert.equal(originPreferenceValidationError("정읍", bases), "운영 중인 사무소 목록에서 출발 기준지를 선택해 주세요.");
+  assert.equal(originPreferenceValidationError("", bases), "기본 출발 기준지를 선택해 주세요.");
+  assert.equal(originPreferenceValidationError("정읍", bases), "운영 중인 기준지 목록에서 선택해 주세요.");
   assert.equal(originPreferenceValidationError("부안", bases), "");
 });
 
@@ -53,4 +54,17 @@ test("uses a saved preference for a new trip and otherwise waits for selection",
   assert.equal(initialTripOrigin("군산", bases), "군산");
   assert.equal(initialTripOrigin("익산", bases), "");
   assert.equal(initialTripOrigin("", ["전주"]), "전주");
+});
+
+test("기준지와 서로 다른 결재자 2명을 저장한 시점부터 첫 설정 완료로 본다", () => {
+  const configured = {
+    default_origin: "군산",
+    report_approver_first: "국장",
+    report_approver_second: "원장",
+    report_approval_configured_at: "2026-08-19T00:00:00.000Z",
+  };
+  assert.equal(travelUserPreferenceConfigured(configured, bases, approvalTitles), true);
+  assert.equal(travelUserPreferenceConfigured({ ...configured, report_approval_configured_at: null }, bases, approvalTitles), false);
+  assert.equal(travelUserPreferenceConfigured({ ...configured, default_origin: "정읍" }, bases, approvalTitles), false);
+  assert.equal(travelUserPreferenceConfigured({ ...configured, report_approver_first: "원장" }, bases, approvalTitles), false);
 });
