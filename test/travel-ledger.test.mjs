@@ -28,7 +28,7 @@ test("대장 자동 등록은 불완전한 일시를 DB timestamp에 넣지 않�
   assert.equal(safeTravelTimestamp("확인 필요"), null);
 });
 
-test("출장 API와 화면은 승인 등록·완료 전환·불러오기를 연결한다", async () => {
+test("출장 API와 화면은 파일 저장 없이 승인 기록·정산 완료·불러오기를 연결한다", async () => {
   const route = await readFile(new URL("../app/api/travel/trips/route.js", import.meta.url), "utf8");
   const workspace = await readFile(new URL("../app/travel/travel-workspace.js", import.meta.url), "utf8");
   assert.match(route, /register-approved/);
@@ -36,7 +36,10 @@ test("출장 API와 화면은 승인 등록·완료 전환·불러오기를 연�
   assert.match(route, /TRAVEL_RECORD_STATUS\.completed/);
   assert.match(route, /\.limit\(200\)/);
   assert.match(route, /\.eq\("document_number", String\(trip\.documentNumber\)\.trim\(\)\)/);
+  assert.doesNotMatch(route, /uploadTravelSourceObject|uploadSource\(/);
   assert.match(workspace, /registerApprovedTrip/);
   assert.match(workspace, /loadTripFromLedger/);
   assert.match(workspace, /내 출장대장 · 누락 점검/);
+  assert.match(workspace, /정산 완료/);
+  assert.doesNotMatch(workspace, /formData\.set\("approvedPdf"|formData\.set\("sourceHwpx"/);
 });

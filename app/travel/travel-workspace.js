@@ -241,6 +241,11 @@ function money(value) {
   return `${KRW.format(Math.round(numeric))}원`;
 }
 
+function ledgerDate(value) {
+  const match = String(value || "").match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return match ? `${match[1]}. ${match[2]}. ${match[3]}.` : "날짜 확인 필요";
+}
+
 function reportLayoutMetrics(content) {
   const lines = String(content || "").split(/\r?\n/);
   const visualLines = lines.reduce((total, line) => total + Math.max(1, Math.ceil([...line].length / 62)), 0);
@@ -496,8 +501,6 @@ export default function TravelWorkspace({ user, defaultOrigin, defaultReportAppr
   const [trip, setTrip] = useState(() => blankTrip(user, defaultOrigin, defaultReportApprovalLine));
   const [approvedPdfFile, setApprovedPdfFile] = useState(null);
   const [sourceHwpxFile, setSourceHwpxFile] = useState(null);
-  const [approvedPdfPending, setApprovedPdfPending] = useState(false);
-  const [sourceHwpxPending, setSourceHwpxPending] = useState(false);
   const [sourceMismatch, setSourceMismatch] = useState("");
   const [recentTrips, setRecentTrips] = useState([]);
   const [ledgerFilter, setLedgerFilter] = useState("all");
@@ -1012,14 +1015,12 @@ export default function TravelWorkspace({ user, defaultOrigin, defaultReportAppr
     return { trip: preparedTrip, notice: nextNotice };
   }
 
-  async function registerApprovedTrip(tripForRecord, files) {
+  async function registerApprovedTrip(tripForRecord) {
     const formData = new FormData();
     const cleanTrip = { ...tripForRecord };
     delete cleanTrip.parsedText;
     formData.set("trip", JSON.stringify(cleanTrip));
     formData.set("intent", "register-approved");
-    if (files.approvedPdf) formData.set("approvedPdf", files.approvedPdf);
-    if (files.sourceHwpx) formData.set("sourceHwpx", files.sourceHwpx);
 
     const response = await fetch("/api/travel/trips", { method: "POST", body: formData });
     const data = await response.json().catch(() => ({}));
@@ -1027,8 +1028,6 @@ export default function TravelWorkspace({ user, defaultOrigin, defaultReportAppr
     if (data.trip?.id && data.trip.id !== tripForRecord.id) {
       setTrip((current) => current.id === tripForRecord.id ? { ...current, id: data.trip.id } : current);
     }
-    if (files.approvedPdf) setApprovedPdfPending(false);
-    if (files.sourceHwpx) setSourceHwpxPending(false);
     setRecentTrips((current) => [data.trip, ...current.filter((item) => item.id !== data.trip.id)].slice(0, 200));
     return data;
   }
@@ -1079,7 +1078,6 @@ export default function TravelWorkspace({ user, defaultOrigin, defaultReportAppr
         const mergedParsed = mergeParsedTravelDocuments(pdfParsed, hwpxParsed);
         if (parseRequestRef.current !== requestId) return;
         setApprovedPdfFile(selectedPdf);
-        setApprovedPdfPending(true);
         setTrip((current) => {
           const next = { ...current };
           ["documentNumber", "documentTitle", "department", "position", "employeeName", "purpose", "destination", "startAt", "endAt"].forEach((key) => {
@@ -1141,11 +1139,9 @@ export default function TravelWorkspace({ user, defaultOrigin, defaultReportAppr
       }
       if (selectedPdf && pdfParsed) {
         setApprovedPdfFile(selectedPdf);
-        setApprovedPdfPending(true);
       }
       if (selectedHwpx && hwpxParsed) {
         setSourceHwpxFile(selectedHwpx);
-        setSourceHwpxPending(true);
       }
 
       if (!hwpxParsed && selectedHwpx && !selectedPdf) {
@@ -1166,11 +1162,8 @@ export default function TravelWorkspace({ user, defaultOrigin, defaultReportAppr
       const applied = await applyParsedTravel(parsed, hwpxParsed ? "원본 HWPX 표" : "승인 PDF", extraNotice, requestId);
       if (!mismatch && applied && parseRequestRef.current === requestId) {
         try {
-          const registered = await registerApprovedTrip(applied.trip, {
-            approvedPdf: selectedPdf && pdfParsed ? selectedPdf : null,
-            sourceHwpx: selectedHwpx && hwpxParsed ? selectedHwpx : null,
-          });
-          setNotice(`${applied.notice} ${registered.alreadyCompleted ? "이미 완료된 출장 기록의 원본을 보완했습니다." : "승인 출장대장에 ‘작성 필요’로 자동 등록했습니다."}`);
+          const registered = await registerApprovedTrip(applied.trip);
+          setNotice(`${applied.notice} ${registered.alreadyCompleted ? "이미 정산 완료된 출장 기록을 확인했습니다." : "승인 출장대장에 ‘정산 필요’로 자동 등록했습니다."}`);
         } catch (registrationError) {
           setNotice(`${applied.notice} 출장대장 자동 등록은 실패했습니다: ${registrationError instanceof Error ? registrationError.message : "잠시 후 다시 시도해 주세요."}`);
         }
@@ -1195,18 +1188,14 @@ export default function TravelWorkspace({ user, defaultOrigin, defaultReportAppr
       const tripForSave = { ...trip };
       delete tripForSave.parsedText;
       formData.set("trip", JSON.stringify({ ...tripForSave, expense }));
-      if (approvedPdfPending && approvedPdfFile) formData.set("approvedPdf", approvedPdfFile);
-      if (sourceHwpxPending && sourceHwpxFile) formData.set("sourceHwpx", sourceHwpxFile);
       const response = await fetch("/api/travel/trips", { method: "POST", body: formData });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "저장하지 못했습니다.");
       setNotice(data.duplicateWarnings?.length
         ? `저장했습니다. 중복 확인 필요: ${data.duplicateWarnings.join(" / ")}`
         : data.sourceCleanupWarning
-          ? `출장 서류와 원본 문서를 저장했습니다. ${data.sourceCleanupWarning}`
-          : "출장 서류와 첨부한 원본 문서를 안전하게 저장했습니다.");
-      setApprovedPdfPending(false);
-      setSourceHwpxPending(false);
+          ? `출장 정산 완료 기록을 저장했습니다. ${data.sourceCleanupWarning}`
+          : "출장 정산 완료 기록을 저장했습니다.");
       setRecentTrips((current) => [data.trip, ...current.filter((item) => item.id !== data.trip.id)].slice(0, 200));
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "저장하지 못했습니다.");
@@ -1218,7 +1207,7 @@ export default function TravelWorkspace({ user, defaultOrigin, defaultReportAppr
   async function deleteTrip(item) {
     const destination = item.destination || "출장지 미입력";
     const tripDate = String(item.start_at || "").slice(0, 10) || "날짜 미입력";
-    if (!window.confirm(`${tripDate} ${destination} 출장을 삭제할까요?\n저장한 서류와 원본 PDF·HWPX가 함께 삭제되며 복구할 수 없습니다.`)) return;
+    if (!window.confirm(`${tripDate} ${destination} 출장 기록을 삭제할까요?\n정산 상태와 작성 내용이 삭제되며 복구할 수 없습니다.`)) return;
 
     const isCurrentTrip = trip.id === item.id;
     setBusy(`delete-${item.id}`);
@@ -1229,8 +1218,6 @@ export default function TravelWorkspace({ user, defaultOrigin, defaultReportAppr
         setRecentTrips((current) => current.filter((savedTrip) => savedTrip.id !== item.id));
         if (isCurrentTrip) {
           setTrip((current) => ({ ...current, id: crypto.randomUUID() }));
-          setApprovedPdfPending(Boolean(approvedPdfFile));
-          setSourceHwpxPending(Boolean(sourceHwpxFile));
         }
         setNotice("이미 삭제된 출장이라 저장 목록에서 정리했습니다.");
         return;
@@ -1239,12 +1226,10 @@ export default function TravelWorkspace({ user, defaultOrigin, defaultReportAppr
       setRecentTrips((current) => current.filter((savedTrip) => savedTrip.id !== data.deletedId));
       if (isCurrentTrip) {
         setTrip((current) => ({ ...current, id: crypto.randomUUID() }));
-        setApprovedPdfPending(Boolean(approvedPdfFile));
-        setSourceHwpxPending(Boolean(sourceHwpxFile));
       }
       setNotice(isCurrentTrip
-        ? "저장본과 원본 문서를 삭제했습니다. 화면의 작성 내용은 저장되지 않은 초안으로 남겨두었습니다."
-        : "저장한 출장 서류와 원본 문서를 삭제했습니다.");
+        ? "출장 기록을 삭제했습니다. 화면의 작성 내용은 저장되지 않은 초안으로 남겨두었습니다."
+        : "저장한 출장 기록을 삭제했습니다.");
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "출장 서류를 삭제하지 못했습니다.");
     } finally {
@@ -1274,8 +1259,6 @@ export default function TravelWorkspace({ user, defaultOrigin, defaultReportAppr
     setTrip(loaded);
     setApprovedPdfFile(null);
     setSourceHwpxFile(null);
-    setApprovedPdfPending(false);
-    setSourceHwpxPending(false);
     setSourceMismatch("");
     if (pdfInputRef.current) pdfInputRef.current.value = "";
     if (hwpxInputRef.current) hwpxInputRef.current.value = "";
@@ -1285,7 +1268,7 @@ export default function TravelWorkspace({ user, defaultOrigin, defaultReportAppr
     setActiveSection("review");
     setNotice(isTravelRecordCompleted(item)
       ? "완료된 출장 서류를 불러왔습니다. 수정 후 다시 저장하면 같은 기록에 반영됩니다."
-      : "작성 필요한 승인 출장을 불러왔습니다. 원본은 안전하게 보관 중이므로 다시 선택하지 않아도 됩니다.");
+      : "정산이 필요한 승인 출장 기록을 불러왔습니다.");
     document.getElementById("workspace")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
@@ -1418,8 +1401,6 @@ export default function TravelWorkspace({ user, defaultOrigin, defaultReportAppr
     setTrip(blankTrip(user, defaultOrigin, defaultReportApprovalLine));
     setApprovedPdfFile(null);
     setSourceHwpxFile(null);
-    setApprovedPdfPending(false);
-    setSourceHwpxPending(false);
     setSourceMismatch("");
     if (pdfInputRef.current) pdfInputRef.current.value = "";
     if (hwpxInputRef.current) hwpxInputRef.current.value = "";
@@ -1452,25 +1433,25 @@ export default function TravelWorkspace({ user, defaultOrigin, defaultReportAppr
           <input ref={hwpxInputRef} type="file" accept=".hwpx,application/vnd.hancom.hwpx,application/zip" hidden onChange={(event) => { readTravelFiles(event.target.files); event.target.value = ""; }} />
           <div className={styles.uploadIntro}>
             <strong>승인 문서 원본</strong>
-            <p>두 파일을 한 번에 끌어놓아도 됩니다. HWPX 표 값을 우선 적용하고 PDF는 승인 증빙으로 함께 저장합니다.</p>
+            <p>두 파일을 한 번에 끌어놓아도 됩니다. HWPX 표 값을 우선 적용하며 파일은 분석 후 저장하지 않습니다.</p>
           </div>
           <div className={styles.uploadFileGrid}>
             <article className={approvedPdfFile ? styles.uploadFileReady : ""}>
               <div className={styles.uploadMark}>PDF</div>
               <span>승인 PDF</span>
               <strong title={approvedPdfFile?.name}>{approvedPdfFile?.name || "전자결재 승인본"}</strong>
-              <small>승인 증빙·원본 보관</small>
+              <small>브라우저 파싱 · 파일 미보관</small>
               <button type="button" onClick={() => pdfInputRef.current?.click()} disabled={Boolean(busy)}>{approvedPdfFile ? "PDF 교체" : "PDF 선택"}</button>
             </article>
             <article className={sourceHwpxFile ? styles.uploadFileReady : ""}>
               <div className={`${styles.uploadMark} ${styles.uploadMarkHwpx}`}>HWPX</div>
               <span>원본 HWPX</span>
               <strong title={sourceHwpxFile?.name}>{sourceHwpxFile?.name || "한글 원본 파일"}</strong>
-              <small>표 구조 우선 추출·원본 보관</small>
+              <small>Kordoc 보조 분석 · 파일 미보관</small>
               <button type="button" onClick={() => hwpxInputRef.current?.click()} disabled={Boolean(busy)}>{sourceHwpxFile ? "HWPX 교체" : "HWPX 선택"}</button>
             </article>
           </div>
-          <p className={styles.uploadHint}>{busy === "parse" ? "문서를 읽고 승인 출장대장에 등록하는 중입니다…" : "PDF는 브라우저에서, HWPX는 정확도를 높이기 위해 로그인한 앱 서버의 Kordoc에서도 일시 분석합니다. 추출에 성공하면 누락 점검을 위해 원본과 출장 정보가 내 출장대장에 자동 등록되며 두 파일 합계는 최대 4MB입니다."}</p>
+          <p className={styles.uploadHint}>{busy === "parse" ? "문서를 읽고 승인 출장 기록을 등록하는 중입니다…" : "PDF/HWPX 파일은 파싱할 때만 사용하고 저장하지 않습니다. 추출된 출장일·출장자·출장지·문서번호와 정산 상태만 내 출장대장에 남기며 두 파일 합계는 최대 4MB입니다."}</p>
         </div>
       </section>
 
@@ -1628,7 +1609,7 @@ export default function TravelWorkspace({ user, defaultOrigin, defaultReportAppr
                 <div><span>02</span><strong>여비지출명세서</strong><small>{Math.ceil(trip.participants.length / 5)}부 · 총 {money(expense.total)}</small></div>
                 <div><span>03</span><strong>공동 출장복명서</strong><small>{trip.participants.map((participant) => participant.employeeName).filter(Boolean).join(", ") || "출장자"}</small></div>
               </div>
-              <div className={styles.actionGrid}><button className={styles.saveButton} type="button" onClick={saveTrip} disabled={Boolean(busy)}>{busy === "save" ? "저장 중…" : "서류·원본 저장"}</button><button className={styles.excelButton} type="button" onClick={downloadExcel} disabled={Boolean(busy)}>{busy === "excel" ? "Excel 만드는 중…" : "Excel 다운로드"}</button><button className={styles.printButton} type="button" onClick={printTrip}>A4 인쇄 / PDF</button></div>
+              <div className={styles.actionGrid}><button className={styles.saveButton} type="button" onClick={saveTrip} disabled={Boolean(busy)}>{busy === "save" ? "저장 중…" : "정산 완료 기록"}</button><button className={styles.excelButton} type="button" onClick={downloadExcel} disabled={Boolean(busy)}>{busy === "excel" ? "Excel 만드는 중…" : "Excel 다운로드"}</button><button className={styles.printButton} type="button" onClick={printTrip}>A4 인쇄 / PDF</button></div>
               <div className={styles.panelFooter}><button type="button" className={styles.secondaryButton} onClick={() => setActiveSection("expense")}>← 금액 수정</button></div>
             </section>
           ) : null}
@@ -1637,27 +1618,25 @@ export default function TravelWorkspace({ user, defaultOrigin, defaultReportAppr
       </section>
 
       <section id="recent" className={styles.recentSection}>
-        <div><p className={styles.eyebrow}>MY BUSINESS TRIP LEDGER</p><h2>내 출장대장 · 누락 점검</h2><span>승인서 업로드 건과 서류 완료 건을 한눈에 비교합니다.</span></div>
+        <div><p className={styles.eyebrow}>MY BUSINESS TRIP LEDGER</p><h2>내 출장대장 · 누락 점검</h2><span>전자결재 출장일과 대장의 정산 완료 여부를 비교합니다.</span></div>
         <div className={styles.ledgerSummary} aria-label="출장대장 집계">
           <div><span>전체 등록</span><strong>{ledgerCounts.total}건</strong></div>
-          <div className={ledgerCounts.pending ? styles.ledgerPending : ""}><span>작성 필요</span><strong>{ledgerCounts.pending}건</strong></div>
-          <div><span>서류 완료</span><strong>{ledgerCounts.completed}건</strong></div>
+          <div className={ledgerCounts.pending ? styles.ledgerPending : ""}><span>정산 필요</span><strong>{ledgerCounts.pending}건</strong></div>
+          <div><span>정산 완료</span><strong>{ledgerCounts.completed}건</strong></div>
         </div>
         <div className={styles.ledgerToolbar}>
           <div role="group" aria-label="출장대장 상태 필터">
-            {[["all", "전체"], ["pending", "작성 필요"], ["completed", "완료"]].map(([value, label]) => (
+            {[["all", "전체"], ["pending", "정산 필요"], ["completed", "정산 완료"]].map(([value, label]) => (
               <button key={value} type="button" className={ledgerFilter === value ? styles.ledgerFilterActive : ""} onClick={() => setLedgerFilter(value)}>{label}</button>
             ))}
           </div>
-          <p>앱에 한 번이라도 올린 승인서 기준입니다. 전자결재에만 있고 앱에 올리지 않은 건은 향후 전자결재 목록 엑셀 대조가 필요합니다.</p>
+          <p>출장일 기준으로 전자결재 목록과 비교하세요. 대장에 없거나 ‘정산 필요’인 출장은 정산 누락 여부를 확인하면 됩니다.</p>
         </div>
         <div className={styles.recentList}>{filteredTrips.length ? filteredTrips.map((item) => {
           const completed = isTravelRecordCompleted(item);
           return <article key={item.id}>
-            <div><strong>{item.destination || "출장지 확인 필요"}</strong><span>{item.purpose || "출장목적 확인 필요"}{item.participant_count > 1 ? ` · ${item.participant_count}명 동반` : ""}</span></div>
-            <small>{String(item.start_at || "").slice(0, 10) || "날짜 확인 필요"}</small>
-            <span className={`${styles.ledgerStatus} ${completed ? styles.ledgerStatusComplete : styles.ledgerStatusPending}`}>{completed ? "서류 완료" : "작성 필요"}</span>
-            <b>{completed ? money(item.total_amount) : "-"}</b>
+            <div><strong>{ledgerDate(item.start_at)} · {item.employee_name || "출장자 확인 필요"}</strong><span>{item.destination || "출장지 확인 필요"}{item.participant_count > 1 ? ` · ${item.participant_count}명 출장` : ""}</span></div>
+            <span className={`${styles.ledgerStatus} ${completed ? styles.ledgerStatusComplete : styles.ledgerStatusPending}`}>{completed ? "정산 완료" : "정산 필요"}</span>
             <button className={styles.loadTripButton} type="button" onClick={() => loadTripFromLedger(item)} disabled={Boolean(busy)}>불러오기</button>
             <button className={styles.deleteTripButton} type="button" onClick={() => deleteTrip(item)} disabled={Boolean(busy)} aria-label={`${String(item.start_at || "").slice(0, 10)} ${item.destination || "출장지 미입력"} 출장 삭제`}>{busy === `delete-${item.id}` ? "삭제 중…" : "삭제"}</button>
           </article>;

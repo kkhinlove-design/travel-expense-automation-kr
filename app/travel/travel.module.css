@@ -295,7 +295,7 @@
 .ledgerToolbar .ledgerFilterActive { border-color: #2c5fc8; background: #2c5fc8; color: #fff; }
 .ledgerToolbar p { margin: 0; color: #6c7584; font-size: 12px; line-height: 1.55; text-align: right; }
 .recentList { display: grid; gap: 8px; margin-top: 21px; }
-.recentList article { display: grid; grid-template-columns: minmax(0, 1fr) 105px 88px 105px 72px 64px; gap: 10px; align-items: center; min-height: 70px; padding: 12px 18px; border: 1px solid var(--line); border-radius: 13px; background: rgba(255,255,255,.84); }
+.recentList article { display: grid; grid-template-columns: minmax(0, 1fr) 88px 72px 64px; gap: 10px; align-items: center; min-height: 70px; padding: 12px 18px; border: 1px solid var(--line); border-radius: 13px; background: rgba(255,255,255,.84); }
 .recentList article strong, .recentList article span { display: block; }
 .recentList article strong { font-size: 14px; }
 .recentList article span, .recentList article small { margin-top: 4px; color: var(--muted); font-size: 12px; }
@@ -436,11 +436,9 @@
   .ledgerToolbar p { text-align: left; }
   .recentList article { grid-template-columns: minmax(0, 1fr) auto; }
   .recentList article > div:first-child { grid-column: 1 / -1; }
-  .recentList article small { grid-column: 1; grid-row: 2; }
-  .recentList article .ledgerStatus { grid-column: 2; grid-row: 2; justify-self: end; }
-  .recentList article b { grid-column: 1 / -1; grid-row: 3; text-align: left; }
-  .recentList article .loadTripButton { grid-column: 1; grid-row: 4; }
-  .recentList article .deleteTripButton { grid-column: 2; grid-row: 4; }
+  .recentList article .ledgerStatus { grid-column: 1 / -1; grid-row: 2; }
+  .recentList article .loadTripButton { grid-column: 1; grid-row: 3; }
+  .recentList article .deleteTripButton { grid-column: 2; grid-row: 3; }
 }
 
 @media print {

@@ -6,11 +6,9 @@ import {
   tripRouteValidationError,
 } from "@/lib/travel-rules";
 import { getSupabaseUser } from "@/lib/supabase/server";
-import { uploadTravelSourceObject } from "@/lib/travel-source-storage";
 import { isTravelRecordCompleted, safeTravelTimestamp, TRAVEL_RECORD_STATUS } from "@/lib/travel-ledger";
 
 const SOURCE_BUCKET = "travel-sources";
-const MAX_SOURCE_FILE_SIZE = 4 * 1024 * 1024;
 const VALID_TRANSPORT_TYPES = new Set(["public", "personal", "corporate"]);
 const SOURCE_ROLES = {
   approvedPdf: { fallbackName: "approved.pdf", contentType: "application/pdf" },
@@ -84,10 +82,6 @@ function validTripId(value) {
   return UUID_PATTERN.test(id) ? id : "";
 }
 
-function fileValue(value) {
-  return value instanceof File && value.size > 0 ? value : null;
-}
-
 function safeFilename(value, fallback) {
   const filename = String(value || fallback)
     .normalize("NFKC")
@@ -157,46 +151,6 @@ function documentKeys(documents) {
   ].filter(Boolean))];
 }
 
-function validateSourceFile(file, role) {
-  if (!file) return "";
-  if (file.size > MAX_SOURCE_FILE_SIZE) return `${file.name || "원본 파일"}이 4MB를 넘습니다.`;
-  const filename = String(file.name || "").toLowerCase();
-  if (role === "approvedPdf" && file.type !== "application/pdf" && !filename.endsWith(".pdf")) {
-    return "승인 증빙 파일은 PDF 형식으로 올려주세요.";
-  }
-  if (role === "sourceHwpx" && !filename.endsWith(".hwpx")) {
-    return "원본 문서는 HWPX 형식으로 올려주세요.";
-  }
-  return "";
-}
-
-async function uploadSource(client, file, role, prefix) {
-  const definition = SOURCE_ROLES[role];
-  const filename = safeFilename(file.name, definition.fallbackName);
-  // Browsers report several vendor-specific MIME values for HWPX. Store the
-  // canonical type so the private bucket allowlist behaves consistently.
-  const contentType = definition.contentType;
-  const objectKey = `${prefix}${role}-${crypto.randomUUID()}-${filename}`;
-  const { error } = await uploadTravelSourceObject(
-    client.storage.from(SOURCE_BUCKET),
-    objectKey,
-    file,
-    contentType,
-  );
-  if (error) {
-    console.error("[travel-source-upload]", {
-      role,
-      status: error.status,
-      code: error.code || error.statusCode,
-      message: error.message,
-    });
-    throw new Error(role === "approvedPdf"
-      ? "승인 PDF를 저장하지 못했습니다. 파일 형식과 4MB 제한을 확인해 주세요."
-      : "HWPX 원본을 저장하지 못했습니다. 파일 형식과 4MB 제한을 확인해 주세요.");
-  }
-  return { objectKey, filename, contentType };
-}
-
 async function removeSources(client, keys) {
   const uniqueKeys = [...new Set(keys.filter(Boolean))];
   if (!uniqueKeys.length) return null;
@@ -260,18 +214,6 @@ export async function POST(request) {
   trip.id = tripId;
   delete trip.parsedText;
   const registerApproved = String(form.get("intent") || "") === "register-approved";
-
-  const approvedPdf = fileValue(form.get("approvedPdf")) || fileValue(form.get("file"));
-  const sourceHwpx = fileValue(form.get("sourceHwpx"));
-  const pdfError = validateSourceFile(approvedPdf, "approvedPdf");
-  const hwpxError = validateSourceFile(sourceHwpx, "sourceHwpx");
-  if (pdfError || hwpxError) return NextResponse.json({ error: pdfError || hwpxError }, { status: 400 });
-  if ((approvedPdf?.size || 0) + (sourceHwpx?.size || 0) > MAX_SOURCE_FILE_SIZE) {
-    return NextResponse.json({ error: "PDF와 HWPX 파일 크기 합계는 4MB 이하여야 합니다." }, { status: 400 });
-  }
-  if (registerApproved && !approvedPdf && !sourceHwpx) {
-    return NextResponse.json({ error: "출장대장 등록에는 승인 PDF 또는 원본 HWPX가 필요합니다." }, { status: 400 });
-  }
 
   let expense = { total: 0 };
   if (!registerApproved) {
@@ -347,20 +289,6 @@ export async function POST(request) {
     sourceHwpx: previousDocuments.sourceHwpx,
     cleanupPending: [...previousDocuments.cleanupPending],
   };
-  const uploadedKeys = [];
-  try {
-    if (approvedPdf) {
-      nextDocuments.approvedPdf = await uploadSource(client, approvedPdf, "approvedPdf", prefix);
-      uploadedKeys.push(nextDocuments.approvedPdf.objectKey);
-    }
-    if (sourceHwpx) {
-      nextDocuments.sourceHwpx = await uploadSource(client, sourceHwpx, "sourceHwpx", prefix);
-      uploadedKeys.push(nextDocuments.sourceHwpx.objectKey);
-    }
-  } catch (error) {
-    await removeSources(client, uploadedKeys);
-    return NextResponse.json({ error: error instanceof Error ? error.message : "원본 파일을 저장하지 못했습니다." }, { status: 500 });
-  }
 
   const activeKeys = new Set([
     nextDocuments.approvedPdf?.objectKey,
@@ -399,7 +327,6 @@ export async function POST(request) {
   };
   const { error } = await client.from("travel_trips").upsert(row, { onConflict: "id" });
   if (error) {
-    await removeSources(client, uploadedKeys);
     return NextResponse.json({ error: "출장 서류를 저장하지 못했습니다." }, { status: 500 });
   }
 
