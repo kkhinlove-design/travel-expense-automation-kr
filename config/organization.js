@@ -26,6 +26,7 @@ export const DEFAULT_REPORT_APPROVER_TITLES = Object.freeze([
   "센터장",
   "사업단장",
   "실장",
+  "국장",
   "본부장",
   "원장",
 ]);

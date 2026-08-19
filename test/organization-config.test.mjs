@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { DEFAULT_ORIGIN_BASES, parseOriginBases } from "../config/organization.js";
+import {
+  DEFAULT_ORIGIN_BASES,
+  DEFAULT_REPORT_APPROVER_TITLES,
+  parseOriginBases,
+} from "../config/organization.js";
 
 test("provides the eleven Jeonbuk office departure bases", () => {
   assert.deepEqual(DEFAULT_ORIGIN_BASES, [
@@ -28,4 +32,9 @@ test("accepts a comma separated organization-specific departure base list", () =
     "부산 지사",
     "대전 사무소",
   ]);
+});
+
+test("복명서 결재자 목록에 국장과 원장을 제공한다", () => {
+  assert.equal(DEFAULT_REPORT_APPROVER_TITLES.includes("국장"), true);
+  assert.equal(DEFAULT_REPORT_APPROVER_TITLES.includes("원장"), true);
 });
