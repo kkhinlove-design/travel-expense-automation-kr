@@ -161,7 +161,7 @@ test("신청서·지출명세서는 지역명만 쓰고 법인차 동승자를 �
     const zip = await JSZip.loadAsync(await workbook.arrayBuffer());
     const application = new DOMParser().parseFromString(await zip.file("xl/worksheets/sheet1.xml").async("string"), "application/xml");
     const statement = new DOMParser().parseFromString(await zip.file("xl/worksheets/sheet2.xml").async("string"), "application/xml");
-    assert.equal(cellText(application, "C6"), "군산");
+    assert.equal(cellText(application, "C6"), trip.destination);
     assert.equal(cellText(application, "G6"), "");
     assert.equal(cellText(application, "F10"), "전주");
     assert.equal(cellText(application, "I10"), "군산");
@@ -178,7 +178,7 @@ test("신청서·지출명세서는 지역명만 쓰고 법인차 동승자를 �
     assert.equal(cellText(statement, "C14"), "익산");
     assert.equal(cellText(statement, "D14"), "전주");
     const report = new DOMParser().parseFromString(await zip.file("xl/worksheets/sheet3.xml").async("string"), "application/xml");
-    assert.equal(cellText(report, "B8"), "군산");
+    assert.equal(cellText(report, "B8"), trip.destination);
   } finally {
     globalThis.fetch = originalFetch;
     globalThis.DOMParser = originalDomParser;

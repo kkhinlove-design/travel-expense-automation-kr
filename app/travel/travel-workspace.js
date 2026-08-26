@@ -412,7 +412,7 @@ function ParticipantApplication({ trip, item, transportLabel, today }) {
       <table className={`${styles.formTable} ${styles.applicationInfoTable}`}><colgroup>{Array.from({ length: 7 }, (_, index) => <col key={index} />)}</colgroup><tbody>
         <tr><th>부서</th><td colSpan="2">{participant.department}</td><th>직급<br />(직위)</th><td>{participant.position}</td><th>성명</th><td>{participant.employeeName}</td></tr>
         <tr><th rowSpan="2">출장<br />일정</th><th>일시</th><td colSpan="5">{dateKorean(trip.startAt)} ({weekday(trip.startAt)})　{item.days}일간</td></tr>
-        <tr><th>장소</th><td colSpan="5">{travelDestinationRegion(trip.destination)}</td></tr>
+        <tr><th>장소</th><td colSpan="5">{trip.destination}</td></tr>
         <tr><th>숙박비</th><th>실제소요액</th><td>{money(item.lodging)}</td><th>상한</th><td colSpan="3">{shouldShowTravelLodgingCap(item) ? `${money(LODGING_CAPS[trip.lodgingRegion] ?? LODGING_CAPS.other)} / 박` : ""}</td></tr>
         <tr><th>식비</th><th>조식제공</th><td>{provided.breakfast ? "○" : "×"}</td><th>중식제공</th><td>{provided.lunch ? "○" : "×"}</td><th>석식제공</th><td>{provided.dinner ? "○" : "×"}</td></tr>
       </tbody></table>
@@ -484,7 +484,7 @@ function PrintBundle({ trip, expense }) {
         <table className={`${styles.formTable} ${styles.reportTable}`}><tbody>
           <tr><th>출장자</th><td>{travelerNames}</td></tr>
           <tr><th>일시</th><td>{dateKorean(trip.startAt)} ({weekday(trip.startAt)}) {timeOnly(trip.startAt)}~{timeOnly(trip.endAt)}</td></tr>
-          <tr><th>출장지</th><td>{travelDestinationRegion(trip.destination)}</td></tr>
+          <tr><th>출장지</th><td>{trip.destination}</td></tr>
           <tr><th>출장목적</th><td className={styles.center}>{trip.purpose}</td></tr>
           <tr><th>출장내용</th><td className={`${styles.reportBody} ${reportDensityClass}`}>{reportLines.map((line, index) => <p key={`${line}-${index}`}>{line}</p>)}</td></tr>
         </tbody></table>
