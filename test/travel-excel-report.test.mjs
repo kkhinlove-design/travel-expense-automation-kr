@@ -130,9 +130,10 @@ test("신청서·지출명세서는 지역명만 쓰고 법인차 동승자를 �
   const trip = {
     tripScope: "domestic",
     purpose: "식품센터 실적보고 및 업무협의",
-    destination: "전북 군산 식품일자리센터 실적보고 협의",
-    origin: "전주",
-    transportDestination: "군산",
+    destination: "전북 군산-식품일자리센터※실적보고 협의",
+    origin: "전주시외버스터미널※승차",
+    transportDestination: "군산시외버스터미널(하차장)",
+    waypoints: ["익산역(환승)"],
     startAt: "2026-08-05T09:00",
     endAt: "2026-08-05T18:00",
     transportType: "corporate",
@@ -162,10 +163,22 @@ test("신청서·지출명세서는 지역명만 쓰고 법인차 동승자를 �
     const statement = new DOMParser().parseFromString(await zip.file("xl/worksheets/sheet2.xml").async("string"), "application/xml");
     assert.equal(cellText(application, "C6"), "군산");
     assert.equal(cellText(application, "G6"), "");
+    assert.equal(cellText(application, "F10"), "전주");
+    assert.equal(cellText(application, "I10"), "군산");
+    assert.equal(cellText(application, "F11"), "군산");
+    assert.equal(cellText(application, "I11"), "전주");
     assert.equal(cellText(statement, "D4"), "군산");
     assert.equal(cellText(statement, "D5"), "군산");
     assert.equal(cellText(statement, "E4"), "법인차");
     assert.equal(cellText(statement, "E5"), "법인차(동승)");
+    assert.equal(cellText(statement, "B13"), "전주");
+    assert.equal(cellText(statement, "C13"), "익산");
+    assert.equal(cellText(statement, "D13"), "군산");
+    assert.equal(cellText(statement, "B14"), "군산");
+    assert.equal(cellText(statement, "C14"), "익산");
+    assert.equal(cellText(statement, "D14"), "전주");
+    const report = new DOMParser().parseFromString(await zip.file("xl/worksheets/sheet3.xml").async("string"), "application/xml");
+    assert.equal(cellText(report, "B8"), "군산");
   } finally {
     globalThis.fetch = originalFetch;
     globalThis.DOMParser = originalDomParser;

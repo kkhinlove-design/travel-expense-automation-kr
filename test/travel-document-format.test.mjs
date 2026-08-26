@@ -13,6 +13,9 @@ test("방문기관과 목적이 포함된 출장지는 지역명만 표시한다
   assert.equal(travelDestinationRegion("전북특별자치도 남원시 (남원 사업단)"), "남원");
   assert.equal(travelDestinationRegion("서울특별시 한국산업단지공단"), "서울");
   assert.equal(travelDestinationRegion("대전 정부청사"), "대전");
+  assert.equal(travelDestinationRegion("전주시외버스터미널※승차"), "전주");
+  assert.equal(travelDestinationRegion("군산-식품센터"), "군산");
+  assert.equal(travelDestinationRegion("춘천시청/별관"), "춘천");
 });
 
 test("숙박비 상한은 실제 숙박비를 청구한 경우에만 표시한다", () => {

@@ -338,15 +338,15 @@ function timeOnly(value) {
 function routeWaypointText(trip, direction = "outbound") {
   const waypoints = normalizeTripWaypoints(trip);
   const ordered = direction === "return" ? [...waypoints].reverse() : waypoints;
-  return ordered.join(" → ") || "-";
+  return ordered.map(travelDestinationRegion).filter(Boolean).join(" → ") || "-";
 }
 
 function routeArrivalText(trip, direction = "outbound") {
-  return tripRoutePoints(trip, direction).at(-1) || "-";
+  return travelDestinationRegion(tripRoutePoints(trip, direction).at(-1)) || "-";
 }
 
 function routeDepartureText(trip, direction = "outbound") {
-  return tripRoutePoints(trip, direction)[0] || "-";
+  return travelDestinationRegion(tripRoutePoints(trip, direction)[0]) || "-";
 }
 
 function participantTransportFares(trip, item) {
@@ -484,7 +484,7 @@ function PrintBundle({ trip, expense }) {
         <table className={`${styles.formTable} ${styles.reportTable}`}><tbody>
           <tr><th>출장자</th><td>{travelerNames}</td></tr>
           <tr><th>일시</th><td>{dateKorean(trip.startAt)} ({weekday(trip.startAt)}) {timeOnly(trip.startAt)}~{timeOnly(trip.endAt)}</td></tr>
-          <tr><th>출장지</th><td>{trip.destination}</td></tr>
+          <tr><th>출장지</th><td>{travelDestinationRegion(trip.destination)}</td></tr>
           <tr><th>출장목적</th><td className={styles.center}>{trip.purpose}</td></tr>
           <tr><th>출장내용</th><td className={`${styles.reportBody} ${reportDensityClass}`}>{reportLines.map((line, index) => <p key={`${line}-${index}`}>{line}</p>)}</td></tr>
         </tbody></table>
