@@ -32,7 +32,7 @@ import {
 } from "@/lib/travel-rules";
 import { initialReportApprovalLine, initialTripOrigin, reportApprovalLineForDocument } from "@/lib/travel-user-preferences";
 import { filterTravelRecords, isTravelRecordCompleted, travelRecordCounts } from "@/lib/travel-ledger";
-import { participantTravelTransportLabel, shouldShowTravelLodgingCap, travelDestinationRegion, travelTransportLabel } from "@/lib/travel-document-format";
+import { participantTravelTransportLabel, travelDestinationRegion, travelTransportLabel } from "@/lib/travel-document-format";
 import styles from "./travel.module.css";
 
 const KRW = new Intl.NumberFormat("ko-KR", { maximumFractionDigits: 0 });
@@ -413,7 +413,7 @@ function ParticipantApplication({ trip, item, transportLabel, today }) {
         <tr><th>부서</th><td colSpan="2">{participant.department}</td><th>직급<br />(직위)</th><td>{participant.position}</td><th>성명</th><td>{participant.employeeName}</td></tr>
         <tr><th rowSpan="2">출장<br />일정</th><th>일시</th><td colSpan="5">{dateKorean(trip.startAt)} ({weekday(trip.startAt)})　{item.days}일간</td></tr>
         <tr><th>장소</th><td colSpan="5">{trip.destination}</td></tr>
-        <tr><th>숙박비</th><th>실제소요액</th><td>{money(item.lodging)}</td><th>상한</th><td colSpan="3">{shouldShowTravelLodgingCap(item) ? `${money(LODGING_CAPS[trip.lodgingRegion] ?? LODGING_CAPS.other)} / 박` : ""}</td></tr>
+        <tr><th>숙박비</th><th>실제소요액</th><td>{money(item.lodging)}</td><th>상한</th><td colSpan="3">{money(LODGING_CAPS[trip.lodgingRegion] ?? LODGING_CAPS.other)} / 박</td></tr>
         <tr><th>식비</th><th>조식제공</th><td>{provided.breakfast ? "○" : "×"}</td><th>중식제공</th><td>{provided.lunch ? "○" : "×"}</td><th>석식제공</th><td>{provided.dinner ? "○" : "×"}</td></tr>
       </tbody></table>
       <table className={`${styles.formTable} ${styles.routeTable}`}><thead><tr><th>운임</th><th>일자</th><th>교통편</th><th>출발지</th><th>도착지</th><th>등급</th><th>금액</th></tr></thead><tbody>
