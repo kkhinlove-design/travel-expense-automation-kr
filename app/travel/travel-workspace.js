@@ -32,6 +32,7 @@ import {
 } from "@/lib/travel-rules";
 import { initialReportApprovalLine, initialTripOrigin, reportApprovalLineForDocument } from "@/lib/travel-user-preferences";
 import { filterTravelRecords, isTravelRecordCompleted, travelRecordCounts } from "@/lib/travel-ledger";
+import { participantTravelTransportLabel, shouldShowTravelLodgingCap, travelDestinationRegion, travelTransportLabel } from "@/lib/travel-document-format";
 import styles from "./travel.module.css";
 
 const KRW = new Intl.NumberFormat("ko-KR", { maximumFractionDigits: 0 });
@@ -334,10 +335,6 @@ function timeOnly(value) {
   return String(value ?? "").slice(11, 16);
 }
 
-function destinationShort(value) {
-  return String(value ?? "").replace(/\([^)]*\)/g, "").trim();
-}
-
 function routeWaypointText(trip, direction = "outbound") {
   const waypoints = normalizeTripWaypoints(trip);
   const ordered = direction === "return" ? [...waypoints].reverse() : waypoints;
@@ -415,8 +412,8 @@ function ParticipantApplication({ trip, item, transportLabel, today }) {
       <table className={`${styles.formTable} ${styles.applicationInfoTable}`}><colgroup>{Array.from({ length: 7 }, (_, index) => <col key={index} />)}</colgroup><tbody>
         <tr><th>부서</th><td colSpan="2">{participant.department}</td><th>직급<br />(직위)</th><td>{participant.position}</td><th>성명</th><td>{participant.employeeName}</td></tr>
         <tr><th rowSpan="2">출장<br />일정</th><th>일시</th><td colSpan="5">{dateKorean(trip.startAt)} ({weekday(trip.startAt)})　{item.days}일간</td></tr>
-        <tr><th>장소</th><td colSpan="5">{destinationShort(trip.destination)}{normalizeTripWaypoints(trip).length ? ` · 경유 ${routeWaypointText(trip)}` : ""}　- {participant.purpose || trip.purpose}</td></tr>
-        <tr><th>숙박비</th><th>실제소요액</th><td>{money(item.lodging)}</td><th>상한</th><td colSpan="3">{money(LODGING_CAPS[trip.lodgingRegion] ?? LODGING_CAPS.other)} / 박</td></tr>
+        <tr><th>장소</th><td colSpan="5">{travelDestinationRegion(trip.destination)}</td></tr>
+        <tr><th>숙박비</th><th>실제소요액</th><td>{money(item.lodging)}</td><th>상한</th><td colSpan="3">{shouldShowTravelLodgingCap(item) ? `${money(LODGING_CAPS[trip.lodgingRegion] ?? LODGING_CAPS.other)} / 박` : ""}</td></tr>
         <tr><th>식비</th><th>조식제공</th><td>{provided.breakfast ? "○" : "×"}</td><th>중식제공</th><td>{provided.lunch ? "○" : "×"}</td><th>석식제공</th><td>{provided.dinner ? "○" : "×"}</td></tr>
       </tbody></table>
       <table className={`${styles.formTable} ${styles.routeTable}`}><thead><tr><th>운임</th><th>일자</th><th>교통편</th><th>출발지</th><th>도착지</th><th>등급</th><th>금액</th></tr></thead><tbody>
@@ -442,7 +439,7 @@ function ExpenseStatement({ trip, items, expense, transportLabel }) {
     <article className={styles.a4Landscape}>
       <h1>여 비 지 출 명 세 서</h1>
       <table className={styles.expenseTable}><thead><tr><th>부서명</th><th>직위</th><th>성명</th><th>출장지</th><th>교통수단</th><th>일수</th><th>야수</th><th>운임</th><th>일비</th><th>숙박료</th><th>식비</th><th>감액</th><th>지급액</th></tr></thead><tbody>
-        {items.map((item) => <tr key={item.participant.id}><td>{item.participant.department}</td><td>{item.participant.position}</td><td>{item.participant.employeeName}</td><td>{destinationShort(trip.destination)}</td><td>{transportLabel}</td><td>{item.days}</td><td>{item.nights}</td><td>{money(item.transport)}</td><td>{money(item.perDiem)}</td><td>{money(item.lodging)}</td><td>{money(item.meal)}</td><td>{money(item.deduction)}</td><td><strong>{money(item.total)}</strong></td></tr>)}
+        {items.map((item) => <tr key={item.participant.id}><td>{item.participant.department}</td><td>{item.participant.position}</td><td>{item.participant.employeeName}</td><td>{travelDestinationRegion(trip.destination)}</td><td>{participantTravelTransportLabel(trip, item.participant)}</td><td>{item.days}</td><td>{item.nights}</td><td>{money(item.transport)}</td><td>{money(item.perDiem)}</td><td>{money(item.lodging)}</td><td>{money(item.meal)}</td><td>{money(item.deduction)}</td><td><strong>{money(item.total)}</strong></td></tr>)}
         {Array.from({ length: Math.max(0, 5 - items.length) }, (_, index) => <tr className={styles.blankExpenseRow} key={`blank-${index}`}><td colSpan="13" /></tr>)}
       </tbody></table>
       <table className={styles.expenseTable}><thead><tr><th colSpan="6">출장명세</th><th colSpan="7">지출명세</th></tr><tr><th>일자</th><th>출발지</th><th>경유지</th><th>도착지</th><th>요금</th><th>일수</th><th>구분</th><th>기준</th><th>단가</th><th>전액</th><th>감액</th><th colSpan="2">지급액</th></tr></thead><tbody>
@@ -458,7 +455,7 @@ function ExpenseStatement({ trip, items, expense, transportLabel }) {
 }
 
 function PrintBundle({ trip, expense }) {
-  const transportLabel = trip.transportType === "corporate" ? "법인차" : trip.transportType === "personal" ? "개인차" : "대중교통";
+  const transportLabel = travelTransportLabel(trip.transportType);
   const reportLines = String(trip.reportContent || buildRuleBasedTravelReport(trip)).split(/\r?\n/);
   const reportMetrics = reportLayoutMetrics(reportLines.join("\n"));
   const reportDensityClass = reportMetrics.characters > 2_400 || reportMetrics.visualLines > 42

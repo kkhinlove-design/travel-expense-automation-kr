@@ -15,6 +15,13 @@ import { calculateTripExpense } from "../lib/travel-rules.js";
 
 const XML_NS = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 
+function cellText(sheet, address) {
+  const cell = [...sheet.getElementsByTagNameNS(XML_NS, "c")].find((item) => item.getAttribute("r") === address);
+  return cell?.getElementsByTagNameNS(XML_NS, "t")[0]?.textContent
+    ?? cell?.getElementsByTagNameNS(XML_NS, "v")[0]?.textContent
+    ?? "";
+}
+
 test("12줄을 넘는 복명 내용도 기존 12개 셀 안에 전부 보존한다", () => {
   const source = Array.from({ length: 31 }, (_, index) => `${index + 1}. 출장 수행 내용 ${"상세 ".repeat((index % 5) + 1)}`).join("\r\n");
   const normalized = source.replace(/\r\n?/g, "\n");
@@ -110,6 +117,55 @@ test("생성된 복명서가 전 내용을 담고 줄바꿈·행높이·A4 한�
     assert.equal(pageSetup?.getAttribute("orientation"), "portrait");
     assert.equal(pageSetup?.getAttribute("fitToWidth"), "1");
     assert.equal(pageSetup?.getAttribute("fitToHeight"), "1");
+  } finally {
+    globalThis.fetch = originalFetch;
+    globalThis.DOMParser = originalDomParser;
+    globalThis.XMLSerializer = originalXmlSerializer;
+  }
+});
+
+test("신청서·지출명세서는 지역명만 쓰고 법인차 동승자를 구분한다", async () => {
+  const templatePath = fileURLToPath(new URL("../public/templates/travel-template.xlsx", import.meta.url));
+  const template = await readFile(templatePath);
+  const trip = {
+    tripScope: "domestic",
+    purpose: "식품센터 실적보고 및 업무협의",
+    destination: "전북 군산 식품일자리센터 실적보고 협의",
+    origin: "전주",
+    transportDestination: "군산",
+    startAt: "2026-08-05T09:00",
+    endAt: "2026-08-05T18:00",
+    transportType: "corporate",
+    projectType: "general",
+    lodgingRegion: "other",
+    outboundTransportActual: 0,
+    returnTransportActual: 0,
+    participants: [
+      { id: "p1", department: "기획실", position: "실장", employeeName: "홍길동", purpose: "업무협의", transportClaimant: true, lodgingActual: 0, deduction: 0, mealsProvided: {} },
+      { id: "p2", department: "기획실", position: "매니저", employeeName: "김철수", purpose: "업무협의", transportClaimant: false, lodgingActual: 0, deduction: 0, mealsProvided: {} },
+    ],
+  };
+  const originalFetch = globalThis.fetch;
+  const originalDomParser = globalThis.DOMParser;
+  const originalXmlSerializer = globalThis.XMLSerializer;
+  globalThis.fetch = async () => ({
+    ok: true,
+    arrayBuffer: async () => template.buffer.slice(template.byteOffset, template.byteOffset + template.byteLength),
+  });
+  globalThis.DOMParser = DOMParser;
+  globalThis.XMLSerializer = XMLSerializer;
+
+  try {
+    const workbook = await buildTravelWorkbook(trip, calculateTripExpense(trip));
+    const zip = await JSZip.loadAsync(await workbook.arrayBuffer());
+    const application = new DOMParser().parseFromString(await zip.file("xl/worksheets/sheet1.xml").async("string"), "application/xml");
+    const statement = new DOMParser().parseFromString(await zip.file("xl/worksheets/sheet2.xml").async("string"), "application/xml");
+    assert.equal(cellText(application, "C6"), "군산");
+    assert.equal(cellText(application, "G6"), "");
+    assert.equal(cellText(statement, "D4"), "군산");
+    assert.equal(cellText(statement, "D5"), "군산");
+    assert.equal(cellText(statement, "E4"), "법인차");
+    assert.equal(cellText(statement, "E5"), "법인차(동승)");
   } finally {
     globalThis.fetch = originalFetch;
     globalThis.DOMParser = originalDomParser;

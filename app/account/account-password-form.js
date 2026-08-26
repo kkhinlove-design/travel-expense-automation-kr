@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { FIRST_REPORT_APPROVER_ONLY_TITLES } from "@/config/organization";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
 
 export default function AccountPasswordForm({
@@ -26,6 +27,7 @@ export default function AccountPasswordForm({
   const [preferenceBusy, setPreferenceBusy] = useState(false);
   const [preferenceMessage, setPreferenceMessage] = useState("");
   const [preferenceError, setPreferenceError] = useState(preferenceLoadError || "");
+  const finalReportApproverTitles = reportApproverTitles.filter((title) => !FIRST_REPORT_APPROVER_ONLY_TITLES.includes(title));
 
   async function submitPreference(event) {
     event.preventDefault();
@@ -141,7 +143,7 @@ export default function AccountPasswordForm({
               <div className="account-approval-grid" style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto minmax(0, 1fr)", alignItems: "center", gap: 10 }}>
                 <label><span style={{ display: "block", marginBottom: 6, color: "#667085", fontSize: 13 }}>1차 결재자</span><select value={reportApprovalLine[0]} onChange={(event) => setReportApprovalLine((current) => [event.target.value, current[1]])} disabled={!preferenceWritable || preferenceBusy} style={{ width: "100%", minHeight: 46, padding: "0 12px", border: "1px solid #b9c7dc", borderRadius: 8, background: "#fff" }}>{reportApproverTitles.map((title) => <option key={`first-${title}`} value={title}>{title}</option>)}</select></label>
                 <span aria-hidden="true" style={{ paddingTop: 24, color: "#667085", fontWeight: 800 }}>→</span>
-                <label><span style={{ display: "block", marginBottom: 6, color: "#667085", fontSize: 13 }}>최종 결재자</span><select value={reportApprovalLine[1]} onChange={(event) => setReportApprovalLine((current) => [current[0], event.target.value])} disabled={!preferenceWritable || preferenceBusy} style={{ width: "100%", minHeight: 46, padding: "0 12px", border: "1px solid #b9c7dc", borderRadius: 8, background: "#fff" }}>{reportApproverTitles.map((title) => <option key={`second-${title}`} value={title}>{title}</option>)}</select></label>
+                <label><span style={{ display: "block", marginBottom: 6, color: "#667085", fontSize: 13 }}>최종 결재자</span><select value={reportApprovalLine[1]} onChange={(event) => setReportApprovalLine((current) => [current[0], event.target.value])} disabled={!preferenceWritable || preferenceBusy} style={{ width: "100%", minHeight: 46, padding: "0 12px", border: "1px solid #b9c7dc", borderRadius: 8, background: "#fff" }}>{finalReportApproverTitles.map((title) => <option key={`second-${title}`} value={title}>{title}</option>)}</select></label>
               </div>
               <p style={{ margin: "8px 0 0", color: "#667085", fontSize: 13, lineHeight: 1.6 }}>기존 2칸 결재 양식을 유지하고 직위만 바꿉니다.</p>
             </fieldset>

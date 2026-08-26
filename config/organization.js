@@ -22,6 +22,8 @@ export const DEFAULT_ORIGIN_BASES = Object.freeze([
 ]);
 
 export const DEFAULT_REPORT_APPROVER_TITLES = Object.freeze([
+  "매니저",
+  "담당",
   "팀장",
   "센터장",
   "사업단장",
@@ -30,6 +32,8 @@ export const DEFAULT_REPORT_APPROVER_TITLES = Object.freeze([
   "본부장",
   "원장",
 ]);
+
+export const FIRST_REPORT_APPROVER_ONLY_TITLES = Object.freeze(["매니저", "담당"]);
 
 export function parseOriginBases(value, fallback = DEFAULT_ORIGIN_BASES) {
   const entries = String(value ?? "")

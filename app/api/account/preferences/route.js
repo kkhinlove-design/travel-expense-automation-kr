@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getSupabaseUser } from "@/lib/supabase/server";
 import {
   allowedApprovalTitlePreference,
+  allowedFinalApprovalTitlePreference,
   allowedOriginPreference,
   approvalLinePreferenceValidationError,
   originPreferenceValidationError,
@@ -25,7 +26,10 @@ export async function PUT(request) {
   if (approvalValidationError) return NextResponse.json({ error: approvalValidationError }, { status: 400 });
 
   const defaultOrigin = allowedOriginPreference(body.defaultOrigin);
-  const reportApprovalLine = body.reportApprovalLine.map((title) => allowedApprovalTitlePreference(title));
+  const reportApprovalLine = [
+    allowedApprovalTitlePreference(body.reportApprovalLine[0]),
+    allowedFinalApprovalTitlePreference(body.reportApprovalLine[1]),
+  ];
   const now = new Date().toISOString();
   const { data, error } = await client
     .from(TRAVEL_USER_PREFERENCES_TABLE)

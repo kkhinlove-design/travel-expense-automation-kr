@@ -34,7 +34,9 @@ test("accepts a comma separated organization-specific departure base list", () =
   ]);
 });
 
-test("복명서 결재자 목록에 국장과 원장을 제공한다", () => {
+test("복명서 결재자 목록에 1차 결재용 매니저·담당과 국장·원장을 제공한다", () => {
+  assert.equal(DEFAULT_REPORT_APPROVER_TITLES.includes("매니저"), true);
+  assert.equal(DEFAULT_REPORT_APPROVER_TITLES.includes("담당"), true);
   assert.equal(DEFAULT_REPORT_APPROVER_TITLES.includes("국장"), true);
   assert.equal(DEFAULT_REPORT_APPROVER_TITLES.includes("원장"), true);
 });

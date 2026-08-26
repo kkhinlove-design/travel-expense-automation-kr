@@ -19,7 +19,7 @@ test("accepts only an office in the configured departure base list", () => {
   assert.equal(allowedOriginPreference("익산", bases), "");
 });
 
-const approvalTitles = ["팀장", "실장", "국장", "원장"];
+const approvalTitles = ["매니저", "담당", "팀장", "실장", "국장", "원장"];
 
 test("accepts only configured report approver titles", () => {
   assert.equal(allowedApprovalTitlePreference(" 실장 ", approvalTitles), "실장");
@@ -30,6 +30,8 @@ test("requires two distinct configured report approvers", () => {
   assert.equal(approvalLinePreferenceValidationError(["국장", "원장"], approvalTitles), "");
   assert.equal(approvalLinePreferenceValidationError(["실장", "원장"], approvalTitles), "");
   assert.equal(approvalLinePreferenceValidationError(["실장", "실장"], approvalTitles), "1차 결재자와 최종 결재자는 서로 다르게 선택해 주세요.");
+  assert.equal(approvalLinePreferenceValidationError(["담당", "팀장"], approvalTitles), "");
+  assert.equal(approvalLinePreferenceValidationError(["팀장", "담당"], approvalTitles), "최종 결재자는 팀장 이상 직위 중에서 선택해 주세요.");
   assert.equal(approvalLinePreferenceValidationError(["실장", "이사장"], approvalTitles), "기관에서 사용하는 결재자 직위 중에서 선택해 주세요.");
 });
 
