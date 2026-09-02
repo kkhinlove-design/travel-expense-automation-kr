@@ -399,7 +399,7 @@ function groupTotals(items) {
   }), { transport: 0, perDiem: 0, lodging: 0, meal: 0, deduction: 0, total: 0 });
 }
 
-function ParticipantApplication({ trip, item, transportLabel, today }) {
+function ParticipantApplication({ trip, item, transportLabel }) {
   const participant = item.participant;
   const provided = participant.mealsProvided ?? {};
   const fares = participantTransportFares(trip, item);
@@ -424,7 +424,7 @@ function ParticipantApplication({ trip, item, transportLabel, today }) {
       <div className={styles.claimText}>
         <p>{TRAVEL_POLICY.legalBasisText}</p>
         <p>첨부 1. 증빙 영수증 1부　2. 유류비 지급신청 기준 1부(해당하는 경우)</p>
-        <p className={styles.center}>{dateKorean(today)}</p>
+        <p className={styles.center}>{dateKorean(trip.startAt)}</p>
         <p className={styles.signature}>신청자　{participant.employeeName}　(인)</p>
         <p className={styles.formNote}>※ 동반 출장일 경우에도 각각 작성</p>
       </div>
@@ -467,7 +467,6 @@ function PrintBundle({ trip, expense }) {
         : reportMetrics.characters > 600 || reportMetrics.visualLines > 16
           ? styles.reportBodyCompact
           : "";
-  const today = new Date().toISOString().slice(0, 10);
   const participantExpenses = expense.participantExpenses ?? [];
   const expenseGroups = [];
   for (let index = 0; index < participantExpenses.length; index += 5) expenseGroups.push(participantExpenses.slice(index, index + 5));
@@ -476,7 +475,7 @@ function PrintBundle({ trip, expense }) {
   const reportApprovalLine = reportApprovalLineForDocument(trip.reportApprovalLine);
   return (
     <section className={styles.printBundle} aria-hidden="true">
-      {participantExpenses.map((item) => <ParticipantApplication key={item.participant.id} trip={trip} item={item} transportLabel={transportLabel} today={today} />)}
+      {participantExpenses.map((item) => <ParticipantApplication key={item.participant.id} trip={trip} item={item} transportLabel={transportLabel} />)}
       {expenseGroups.map((items, index) => <ExpenseStatement key={`expense-${index}`} trip={trip} items={items} expense={expense} transportLabel={transportLabel} />)}
       <article className={`${styles.a4Portrait} ${styles.reportPage}`}>
         <h1>출장복명서</h1>
@@ -488,7 +487,7 @@ function PrintBundle({ trip, expense }) {
           <tr><th>출장목적</th><td className={styles.center}>{trip.purpose}</td></tr>
           <tr><th>출장내용</th><td className={`${styles.reportBody} ${reportDensityClass}`}>{reportLines.map((line, index) => <p key={`${line}-${index}`}>{line}</p>)}</td></tr>
         </tbody></table>
-        <div className={styles.reportSign}><p>위와 같이 복명합니다.</p><p>{dateKorean(today)}</p><p>복명자 :　{reporter?.employeeName || ""}　(인)</p></div>
+        <div className={styles.reportSign}><p>위와 같이 복명합니다.</p><p>{dateKorean(trip.startAt)}</p><p>복명자 :　{reporter?.employeeName || ""}　(인)</p></div>
       </article>
     </section>
   );
