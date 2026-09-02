@@ -6,6 +6,8 @@ node_modules/
 out/
 coverage/
 *.tsbuildinfo
+/output/
+/tmp/
 
 # Local environment and Vercel linkage
 .env
