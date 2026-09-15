@@ -34,15 +34,15 @@
     "check": "npm test && npm run build"
   },
   "dependencies": {
-    "@mlc-ai/web-llm": "0.2.84",
-    "@supabase/ssr": "0.12.4",
-    "@supabase/supabase-js": "2.112.2",
-    "jszip": "3.10.1",
-    "kordoc": "4.7.2",
-    "next": "15.5.23",
-    "pdfjs-dist": "4.10.38",
-    "react": "19.2.6",
-    "react-dom": "19.2.6",
+    "@mlc-ai/web-llm": "0.2.85",
+    "@supabase/ssr": "0.12.7",
+    "@supabase/supabase-js": "2.116.0",
+    "jszip": "3.10.2",
+    "kordoc": "4.13.1",
+    "next": "16.3.5",
+    "pdfjs-dist": "6.3.289",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },
   "overrides": {
