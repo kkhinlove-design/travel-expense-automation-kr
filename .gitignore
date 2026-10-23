@@ -31,3 +31,6 @@ dev-err.log
 Thumbs.db
 .idea/
 .vscode/
+
+.vercel
+.env*
