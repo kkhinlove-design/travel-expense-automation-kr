@@ -6,6 +6,7 @@ import { APP_FOOTER, ORGANIZATION_CONFIG } from "@/config/organization";
 import { TRAVEL_POLICY } from "@/config/travel-policy";
 import { buildTravelWorkbook, travelWorkbookFilename } from "@/lib/travel-excel";
 import { findAutomaticFareMatch } from "@/lib/travel-fare-matching";
+import { isManualFareSource, clearPresetFareForDateChange } from "@/lib/fare-dates";
 import { extractApprovedTravelHwpx, extractApprovedTravelPdf } from "@/lib/travel-parser";
 import {
   buildRuleBasedTravelReport,
@@ -213,12 +214,16 @@ function tripWithFarePreset(current, item) {
     grade,
     oneWayFare: outbound,
     retrievedAt: appliedAt,
+    effectiveFrom: item.outboundEffectiveFrom || item.effective_from,
+    travelDate: String(current.startAt || "").slice(0, 10),
   };
   const returnSource = {
     ...outboundSource,
     departure: item.destination,
     arrival: item.origin,
     oneWayFare: returning,
+    effectiveFrom: item.returnEffectiveFrom || item.effective_from,
+    travelDate: String(current.endAt || "").slice(0, 10),
   };
   return {
     ...current,
@@ -307,11 +312,6 @@ function updateReportForBasisChange(current, next) {
     reportNeedsReview: Boolean(current.reportNeedsReview
       || (basisChanged && ["ai", "manual"].includes(source) && String(current.reportContent || "").trim())),
   };
-}
-
-function isManualFareSource(source) {
-  return source?.sourceType === "preset"
-    || /수동|직접 입력|저장된 대중교통 운임/.test(String(source?.provider || ""));
 }
 
 function dateKorean(value) {
@@ -534,6 +534,9 @@ export default function TravelWorkspace({ user, defaultOrigin, defaultReportAppr
       return;
     }
     const automaticPreset = automaticMatch.preset;
+    if (!automaticPreset && automaticMatch.unavailableDate) {
+      setNotice("해당 출장일에 적용할 운임이 아직 등록되지 않았습니다. 인상 전 요금을 대신 적용하지 않습니다. 확인된 방향별 요금을 직접 입력하거나 관리자에게 새 운임 등록을 요청해 주세요.");
+    }
     if (!automaticPreset) return;
 
     setTrip((current) => {
@@ -546,7 +549,7 @@ export default function TravelWorkspace({ user, defaultOrigin, defaultReportAppr
       return updateReportForBasisChange(current, tripWithFarePreset(current, currentMatch.preset));
     });
     setNotice(`관리자 운임 ${automaticPreset.origin} → ${automaticPreset.destination} 왕복 ${money(fareValue(automaticPreset.outbound_fare ?? automaticPreset.outboundFare) + fareValue(automaticPreset.return_fare ?? automaticPreset.returnFare))}을 자동 적용했습니다.`);
-  }, [farePresets, trip.id, trip.origin, trip.destination, trip.transportDestination, trip.transportType, trip.tripScope, trip.waypoints, trip.outboundTransportActual, trip.returnTransportActual, trip.fareSource, trip.fareSources]);
+  }, [farePresets, trip.id, trip.origin, trip.destination, trip.transportDestination, trip.transportType, trip.tripScope, trip.startAt, trip.endAt, trip.waypoints, trip.outboundTransportActual, trip.returnTransportActual, trip.fareSource, trip.fareSources]);
 
   const update = (key, value) => {
     if (["origin", "transportDestination", "destination", "startAt", "endAt", "transportType", "tripScope"].includes(key)) {
@@ -575,7 +578,7 @@ export default function TravelWorkspace({ user, defaultOrigin, defaultReportAppr
       const datedFareChanged = dateChanged && fareSources.some((source) => !isManualFareSource(source));
       const invalidateFare = routeBasisChanged || datedFareChanged;
       const next = {
-        ...current,
+        ...(datedFareChanged ? clearPresetFareForDateChange(current) : current),
         [key]: value,
         ...(key === "destination" ? { transportDestination: value } : {}),
         ...(key === "purpose" ? {
@@ -664,10 +667,13 @@ export default function TravelWorkspace({ user, defaultOrigin, defaultReportAppr
     // 금액으로 읽지 못한 값이 남아 있으면 제출 서류를 만들지 않는다.
     // 0원으로 채운 신청서가 그대로 결재에 올라가는 일을 막는다.
     const amountIssue = tripAmountIssues(trip)[0];
+    const missingDatedFare = !tripTransportFares(trip).total
+      && findAutomaticFareMatch(trip, farePresets).unavailableDate;
     return sourceMismatch
       || tripRequiredInformationValidationError(trip)
       || tripDateValidationError(trip.startAt, trip.endAt)
       || amountIssue
+      || (missingDatedFare ? "해당 출장일의 운임이 미등록 상태입니다. 확인된 운임을 입력한 뒤 서류를 만들어 주세요." : "")
       || tripRouteValidationError(trip)
       || reportDocumentError(trip)
       || (trip.reportNeedsReview ? "출장 정보가 바뀌었습니다. 복명 내용을 다시 작성하거나 확인 완료해 주세요." : "");
@@ -1252,7 +1258,11 @@ export default function TravelWorkspace({ user, defaultOrigin, defaultReportAppr
         : participants[0].id,
       missing: Array.isArray(item.payload.missing) ? item.payload.missing : parsedTravelMissing(item.payload),
     };
-    setTrip(loaded);
+    // 저장된 실적은 자동 저장하지 않는다. 편집 화면에 다시 불러올 때만
+    // 기준표로 산출했던 금액을 해당 출장일의 이력으로 재계산한다.
+    const sources = [loaded.fareSource, ...Object.values(loaded.fareSources || {})].filter(Boolean);
+    const hasOnlyPresets = sources.length > 0 && sources.every((source) => source.sourceType === "preset");
+    setTrip(hasOnlyPresets ? clearPresetFareForDateChange(loaded) : loaded);
     setApprovedPdfFile(null);
     setSourceHwpxFile(null);
     setSourceMismatch("");

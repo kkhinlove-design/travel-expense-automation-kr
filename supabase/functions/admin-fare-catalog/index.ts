@@ -41,6 +41,14 @@ Deno.serve(async (request) => {
     const { caller, adminClient } = authorization;
 
     const body = await request.json() as Record<string, unknown>;
+    const effectiveFrom = String(body.effectiveFrom || "");
+    const parsedDate = new Date(`${effectiveFrom}T00:00:00Z`);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(effectiveFrom)
+      || !Number.isFinite(parsedDate.getTime())
+      || parsedDate.toISOString().slice(0, 10) !== effectiveFrom
+      || effectiveFrom < "1900-01-01") {
+      return respond({ error: "effective_date_required" }, 400);
+    }
     const rawRows = body.presets;
     if (!Array.isArray(rawRows) || !rawRows.length) {
       return respond({ error: "presets_required" }, 400);
@@ -80,6 +88,7 @@ Deno.serve(async (request) => {
           destination,
           outbound_fare: outboundFare,
           return_fare: returnFare,
+          effective_from: effectiveFrom,
           updated_at: new Date().toISOString(),
           updated_by: caller.id,
         });
@@ -94,7 +103,7 @@ Deno.serve(async (request) => {
 
     const { data: existing, error: existingError } = await adminClient.from(
       "travel_fare_catalog",
-    ).select("id,origin,destination");
+    ).select("id,origin,destination").eq("effective_from", effectiveFrom);
     if (existingError) return respond({ error: "catalog_read_failed" }, 500);
     const existingByRoute = new Map(
       (existing || []).map((
@@ -115,7 +124,7 @@ Deno.serve(async (request) => {
         : item;
     });
     const { error: upsertError } = await adminClient.from("travel_fare_catalog")
-      .upsert(upsertRows, { onConflict: "origin,destination" });
+      .upsert(upsertRows, { onConflict: "origin,destination,effective_from" });
     if (upsertError) return respond({ error: "catalog_write_failed" }, 500);
 
     const created = rows.filter((item) =>
@@ -129,6 +138,7 @@ Deno.serve(async (request) => {
       created,
       updated: rows.length - created,
       removed: 0,
+      effectiveFrom,
     });
   } catch {
     return respond({ error: "invalid_request" }, 400);

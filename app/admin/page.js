@@ -62,6 +62,7 @@ export default function AdminPage() {
   const [bulkMessage, setBulkMessage] = useState("");
   const [bulkError, setBulkError] = useState("");
   const [fareRows, setFareRows] = useState([]);
+  const [fareEffectiveFrom, setFareEffectiveFrom] = useState("");
   const [fareFileName, setFareFileName] = useState("");
   const [fareBusy, setFareBusy] = useState(false);
   const [fareSourceBusy, setFareSourceBusy] = useState(false);
@@ -280,15 +281,19 @@ export default function AdminPage() {
 
   async function submitFareCatalog() {
     if (!fareRows.length) return;
+    if (!fareEffectiveFrom) {
+      setFareError("새 운임이 적용되는 시작일을 입력해 주세요.");
+      return;
+    }
     setFareBusy(true);
     setFareMessage("");
     setFareError("");
-    const { data, error: invokeError } = await getSupabaseBrowserClient().functions.invoke("admin-fare-catalog", { body: { presets: fareRows } });
+    const { data, error: invokeError } = await getSupabaseBrowserClient().functions.invoke("admin-fare-catalog", { body: { presets: fareRows, effectiveFrom: fareEffectiveFrom } });
     if (invokeError) setFareError(invokeError.message || "공용 운임 기준표 업로드에 실패했습니다. 관리자 로그인 상태와 함수 배포 상태를 확인하세요.");
     else if (data?.error) setFareError(data.error === "validation_failed" ? "운임 기준표 검증에 실패했습니다. 양식을 다시 확인하세요." : "공용 운임 기준표를 저장하지 못했습니다.");
     else {
       // 파일에서 빠진 노선은 서버가 지우지 않는다. 항상 0인 "제거" 수치는 알리지 않는다.
-      setFareMessage(`공용 기준표 ${data.total}개 노선을 반영했습니다. 신규 ${data.created}개 · 수정 ${data.updated}개`);
+      setFareMessage(`${data.effectiveFrom}부터 적용할 공용 기준표 ${data.total}개 노선을 반영했습니다. 이전 날짜의 운임은 보존됩니다. 신규 ${data.created}개 · 수정 ${data.updated}개`);
       setFareRows([]);
       setFareFileName("");
       setFareSourceUrl("");
@@ -426,6 +431,10 @@ export default function AdminPage() {
       <section id="fare-settings" style={{ width: "min(100%, 720px)", boxSizing: "border-box", padding: 32, borderRadius: 18, background: "#fff", boxShadow: "0 14px 50px #1d2b4418" }}>
         <p style={{ margin: "0 0 6px", color: "#2359ad", fontSize: 13, fontWeight: 800, letterSpacing: ".08em" }}>운임 설정</p>
         <h2 style={{ margin: 0 }}>공용 대중교통 운임 기준표</h2>
+        <p style={{ color: "#475467", lineHeight: 1.6 }}>가는 날과 오는 날에 유효한 요금을 각각 적용합니다. 인상일을 2026. 10. 01.로 등록하면 9월 30일까지는 이전 금액을 사용합니다.</p>
+        <label style={{ display: "grid", gap: 8, marginTop: 14, fontWeight: 700 }}>운임 적용 시작일
+          <input aria-label="운임 적용 시작일" type="date" min="1900-01-01" value={fareEffectiveFrom} onChange={(event) => setFareEffectiveFrom(event.target.value)} style={{ padding: 10, border: "1px solid #b9c7dc", borderRadius: 8, maxWidth: 220 }} />
+        </label>
         <p style={{ color: "#667085", lineHeight: 1.6 }}>관리자가 확인해 반영한 노선만 전 직원의 자동 운임 계산에 적용됩니다. 출장의 출발지→도착지 노선을 먼저 찾고, 정방향이 없을 때만 도착지→출발지 노선의 가는 길·오는 길 금액을 뒤집어 사용합니다.</p>
         <p style={{ margin: "10px 0 0", color: "#475467", lineHeight: 1.6, fontSize: 14 }}>Google 시트에 같은 노선의 등급이 여러 개면 <strong>우등 → 일반 → 프리미엄</strong> 순으로 한 건을 선택합니다. 시트 또는 Excel에서 빠진 기존 공용 노선은 삭제하지 않습니다.</p>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 18 }}>

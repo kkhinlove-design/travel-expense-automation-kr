@@ -9,6 +9,8 @@ function output(row) {
     outbound_fare: row.outbound_fare,
     return_fare: row.return_fare,
     updated_at: row.updated_at,
+    effective_from: row.effective_from,
+    effective_until: row.effective_until,
     scope: "global",
   };
 }
@@ -16,13 +18,17 @@ function output(row) {
 export async function GET() {
   const { client, user } = await getSupabaseUser();
   if (!user) return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
-  const { data, error } = await client
-    .from("travel_fare_catalog")
-    .select("id,origin,destination,outbound_fare,return_fare,updated_at")
-    .order("origin", { ascending: true })
-    .limit(500);
-  if (error) return NextResponse.json({ error: "관리자 운임 기준표를 불러오지 못했습니다." }, { status: 500 });
-  const presets = (data || []).map(output);
+  const presets = [];
+  for (let offset = 0; ; offset += 500) {
+    const { data, error } = await client
+      .from("travel_fare_catalog")
+      .select("id,origin,destination,outbound_fare,return_fare,effective_from,effective_until,updated_at")
+      .order("id", { ascending: true })
+      .range(offset, offset + 499);
+    if (error) return NextResponse.json({ error: "관리자 운임 기준표를 불러오지 못했습니다." }, { status: 500 });
+    presets.push(...(data || []).map(output));
+    if (!data || data.length < 500) break;
+  }
   return NextResponse.json({ presets, globalCount: presets.length, personalCount: 0 });
 }
 

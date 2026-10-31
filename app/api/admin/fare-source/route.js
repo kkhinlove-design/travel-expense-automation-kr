@@ -7,6 +7,7 @@ export const dynamic = "force-dynamic";
 
 const DEFAULT_SPREADSHEET_ID = "1mnIzfAF1_T0lbzec93VZ0KYmDWJJM2EnG_3S5OYe6A4";
 const DEFAULT_SHEET_GID = "2004325275";
+const DOMESTIC_SHEET_GID = "1150282492";
 const MAX_CSV_BYTES = 2 * 1024 * 1024;
 
 function sourceConfig() {
@@ -30,15 +31,26 @@ export async function GET() {
 
   try {
     const config = sourceConfig();
-    const response = await fetch(config.csvUrl, {
-      cache: "no-store",
-      signal: AbortSignal.timeout(10_000),
-      headers: { accept: "text/csv,text/plain;q=0.9" },
-    });
-    if (!response.ok) throw new Error("fare_source_fetch_failed");
-    const csvText = await response.text();
-    if (new TextEncoder().encode(csvText).byteLength > MAX_CSV_BYTES) throw new Error("fare_source_too_large");
-    const parsed = parseGoogleFareSourceCsv(csvText);
+    const gids = process.env.FARE_SOURCE_GOOGLE_SHEET_GID || process.env.FARE_SOURCE_GOOGLE_SHEET_ID
+      ? [config.gid] : [DOMESTIC_SHEET_GID, config.gid];
+    const sheets = await Promise.all(gids.map(async (gid) => {
+      const response = await fetch(`https://docs.google.com/spreadsheets/d/${config.spreadsheetId}/export?format=csv&gid=${gid}`, {
+        cache: "no-store",
+        signal: AbortSignal.timeout(10_000),
+        headers: { accept: "text/csv,text/plain;q=0.9" },
+      });
+      if (!response.ok) throw new Error("fare_source_fetch_failed");
+      const csvText = await response.text();
+      if (new TextEncoder().encode(csvText).byteLength > MAX_CSV_BYTES) throw new Error("fare_source_too_large");
+      return parseGoogleFareSourceCsv(csvText);
+    }));
+    const parsed = {
+      rows: sheets.flatMap((sheet) => sheet.rows),
+      sourceRowCount: sheets.reduce((total, sheet) => total + sheet.sourceRowCount, 0),
+      routeCount: sheets.reduce((total, sheet) => total + sheet.routeCount, 0),
+      alternativeCount: sheets.reduce((total, sheet) => total + sheet.alternativeCount, 0),
+      reversePairCount: sheets.reduce((total, sheet) => total + sheet.reversePairCount, 0),
+    };
     return NextResponse.json({
       ...parsed,
       sourceName: "Google 시트 · 운임 조사",
