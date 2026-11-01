@@ -1,0 +1,192 @@
+{
+  "effectiveFrom": "2026-10-01",
+  "source": "https://docs.google.com/spreadsheets/d/1mnIzfAF1_T0lbzec93VZ0KYmDWJJM2EnG_3S5OYe6A4/edit",
+  "sourceGids": [
+    "1150282492",
+    "2004325275"
+  ],
+  "rows": [
+    {
+      "origin": "군산",
+      "destination": "고창",
+      "previousFare": 7600,
+      "outboundFare": 8300,
+      "returnFare": 8300
+    },
+    {
+      "origin": "군산",
+      "destination": "김제",
+      "previousFare": 4600,
+      "outboundFare": 5000,
+      "returnFare": 5000
+    },
+    {
+      "origin": "군산",
+      "destination": "부안",
+      "previousFare": 7400,
+      "outboundFare": 8100,
+      "returnFare": 8100
+    },
+    {
+      "origin": "군산",
+      "destination": "익산",
+      "previousFare": 3400,
+      "outboundFare": 3700,
+      "returnFare": 3700
+    },
+    {
+      "origin": "군산",
+      "destination": "인천공항",
+      "previousFare": 29700,
+      "outboundFare": 32400,
+      "returnFare": 32400
+    },
+    {
+      "origin": "군산",
+      "destination": "전주",
+      "previousFare": 6600,
+      "outboundFare": 7200,
+      "returnFare": 7200
+    },
+    {
+      "origin": "군산",
+      "destination": "정읍",
+      "previousFare": 9800,
+      "outboundFare": 10700,
+      "returnFare": 10700
+    },
+    {
+      "origin": "익산",
+      "destination": "고창",
+      "previousFare": 7900,
+      "outboundFare": 8600,
+      "returnFare": 8600
+    },
+    {
+      "origin": "익산",
+      "destination": "군산",
+      "previousFare": 3400,
+      "outboundFare": 3700,
+      "returnFare": 3700
+    },
+    {
+      "origin": "익산",
+      "destination": "김제",
+      "previousFare": 3000,
+      "outboundFare": 3300,
+      "returnFare": 3300
+    },
+    {
+      "origin": "익산",
+      "destination": "부안",
+      "previousFare": 5800,
+      "outboundFare": 6400,
+      "returnFare": 6400
+    },
+    {
+      "origin": "익산",
+      "destination": "정읍",
+      "previousFare": 6400,
+      "outboundFare": 7000,
+      "returnFare": 7000
+    },
+    {
+      "origin": "전주",
+      "destination": "고창",
+      "previousFare": 8800,
+      "outboundFare": 9600,
+      "returnFare": 9600
+    },
+    {
+      "origin": "전주",
+      "destination": "군산",
+      "previousFare": 6600,
+      "outboundFare": 7200,
+      "returnFare": 7200
+    },
+    {
+      "origin": "전주",
+      "destination": "김제",
+      "previousFare": 4300,
+      "outboundFare": 4600,
+      "returnFare": 4600
+    },
+    {
+      "origin": "전주",
+      "destination": "남원",
+      "previousFare": 6900,
+      "outboundFare": 7500,
+      "returnFare": 7500
+    },
+    {
+      "origin": "전주",
+      "destination": "부안",
+      "previousFare": 4300,
+      "outboundFare": 7500,
+      "returnFare": 7500
+    },
+    {
+      "origin": "전주",
+      "destination": "익산",
+      "previousFare": 3700,
+      "outboundFare": 4000,
+      "returnFare": 4000
+    },
+    {
+      "origin": "전주",
+      "destination": "정읍",
+      "previousFare": 5500,
+      "outboundFare": 6300,
+      "returnFare": 6300
+    },
+    {
+      "origin": "전주",
+      "destination": "진안",
+      "previousFare": 4600,
+      "outboundFare": 5000,
+      "returnFare": 5000
+    }
+  ],
+  "pending": [
+    {
+      "origin": "전주",
+      "destination": "광주",
+      "reason": "기존 11,500원과 시트 8,600원(일반)의 등급 차이 확인 필요"
+    },
+    {
+      "origin": "군산",
+      "destination": "광주",
+      "reason": "10월 1일 이후 적용 금액 미확인"
+    },
+    {
+      "origin": "군산",
+      "destination": "대구서부",
+      "reason": "10월 1일 이후 적용 금액 미확인"
+    },
+    {
+      "origin": "군산",
+      "destination": "울산",
+      "reason": "10월 1일 이후 적용 금액 미확인"
+    },
+    {
+      "origin": "군산",
+      "destination": "포항",
+      "reason": "10월 1일 이후 적용 금액 미확인"
+    },
+    {
+      "origin": "익산",
+      "destination": "광주",
+      "reason": "10월 1일 이후 적용 금액 미확인"
+    },
+    {
+      "origin": "익산",
+      "destination": "서울",
+      "reason": "10월 1일 이후 적용 금액 미확인"
+    },
+    {
+      "origin": "전주",
+      "destination": "서울",
+      "reason": "10월 1일 이후 적용 금액 미확인"
+    }
+  ]
+}
