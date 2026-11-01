@@ -121,7 +121,7 @@
     {
       "origin": "전주",
       "destination": "부안",
-      "previousFare": 4300,
+      "previousFare": 6900,
       "outboundFare": 7500,
       "returnFare": 7500
     },
@@ -149,11 +149,6 @@
   ],
   "pending": [
     {
-      "origin": "전주",
-      "destination": "광주",
-      "reason": "기존 11,500원과 시트 8,600원(일반)의 등급 차이 확인 필요"
-    },
-    {
       "origin": "군산",
       "destination": "광주",
       "reason": "10월 1일 이후 적용 금액 미확인"
@@ -180,11 +175,6 @@
     },
     {
       "origin": "익산",
-      "destination": "서울",
-      "reason": "10월 1일 이후 적용 금액 미확인"
-    },
-    {
-      "origin": "전주",
       "destination": "서울",
       "reason": "10월 1일 이후 적용 금액 미확인"
     }

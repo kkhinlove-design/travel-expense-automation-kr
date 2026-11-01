@@ -1,0 +1,42 @@
+{
+  "effectiveFrom": "2026-10-01",
+  "source": "시외버스 요금인상 비교표(2026.10.01. 기준), 전북특별자치도버스운송사업조합",
+  "gradeRule": "신규 노선은 직행과 우등이 모두 있으면 우등, 한 등급만 있으면 그 등급을 쓴다. 2026. 11. 01. 사용자 결정.",
+  "corrections": [
+    { "origin": "전주", "destination": "부안", "effectiveFrom": "0001-01-01", "wrongFare": 4300, "fare": 6900, "reason": "비교표 변경 전 직행 요금으로 정정" }
+  ],
+  "resolvedPending": [
+    { "origin": "전주", "destination": "광주", "grade": "우등", "fare": 12500, "reason": "기존 11,500원이 비교표 우등 변경 전 요금과 일치" },
+    { "origin": "전주", "destination": "서울", "grade": "고속 우등", "fare": 23900, "reason": "비교표 금액이 아닌 사용자 지정 금액. 2026. 09. 30. 이전 22,000원은 유지" }
+  ],
+  "additions": [
+    { "origin": "전주", "destination": "장수", "grade": "직행", "previousFare": 8300, "fare": 9100 },
+    { "origin": "전주", "destination": "무주", "grade": "직행", "previousFare": 10600, "fare": 11500 },
+    { "origin": "전주", "destination": "임실", "grade": "직행", "previousFare": 4300, "fare": 4700 },
+    { "origin": "전주", "destination": "순창", "grade": "직행", "previousFare": 8300, "fare": 9000 },
+    { "origin": "전주", "destination": "수원", "grade": "우등", "previousFare": 20400, "fare": 22200 },
+    { "origin": "전주", "destination": "안양", "grade": "우등", "previousFare": 23200, "fare": 25300 },
+    { "origin": "전주", "destination": "부천", "grade": "우등", "previousFare": 25000, "fare": 27500 },
+    { "origin": "전주", "destination": "안산", "grade": "우등", "previousFare": 22700, "fare": 24700 },
+    { "origin": "전주", "destination": "용인", "grade": "우등", "previousFare": 21900, "fare": 23900 },
+    { "origin": "전주", "destination": "의정부", "grade": "우등", "previousFare": 27100, "fare": 30000 },
+    { "origin": "전주", "destination": "마산", "grade": "우등", "previousFare": 22500, "fare": 24500 },
+    { "origin": "전주", "destination": "창원", "grade": "직행", "previousFare": 17400, "fare": 18900 },
+    { "origin": "전주", "destination": "김해", "grade": "우등", "previousFare": 25200, "fare": 27500 },
+    { "origin": "전주", "destination": "양산", "grade": "우등", "previousFare": 28200, "fare": 30700 },
+    { "origin": "전주", "destination": "목포", "grade": "우등", "previousFare": 20700, "fare": 22600 },
+    { "origin": "전주", "destination": "순천", "grade": "우등", "previousFare": 24100, "fare": 26200 },
+    { "origin": "전주", "destination": "여수", "grade": "우등", "previousFare": 30500, "fare": 33300 },
+    { "origin": "전주", "destination": "청주", "grade": "우등", "previousFare": 15900, "fare": 17400 },
+    { "origin": "전주", "destination": "춘천", "grade": "우등", "previousFare": 32400, "fare": 35300 },
+    { "origin": "전주", "destination": "대구", "grade": "우등", "previousFare": 19400, "fare": 21200 },
+    { "origin": "전주", "destination": "경주", "grade": "우등", "previousFare": 26900, "fare": 29300 },
+    { "origin": "전주", "destination": "포항", "grade": "우등", "previousFare": 34200, "fare": 35300 },
+    { "origin": "전주", "destination": "구미", "grade": "우등", "previousFare": 20300, "fare": 22100 },
+    { "origin": "전주", "destination": "인천공항", "grade": "우등", "previousFare": 30700, "fare": 32000 },
+    { "origin": "익산", "destination": "인천공항", "grade": "우등", "previousFare": 34700, "fare": 36000 },
+    { "origin": "정읍", "destination": "인천공항", "grade": "우등", "previousFare": 36300, "fare": 39600 },
+    { "origin": "김제", "destination": "인천공항", "grade": "우등", "previousFare": 30500, "fare": 33200 },
+    { "origin": "고창", "destination": "인천공항", "grade": "우등", "previousFare": 42500, "fare": 46400 }
+  ]
+}
