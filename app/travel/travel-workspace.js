@@ -32,7 +32,7 @@ import {
   tripTransportFares,
 } from "@/lib/travel-rules";
 import { initialReportApprovalLine, initialTripOrigin, reportApprovalLineForDocument } from "@/lib/travel-user-preferences";
-import { filterTravelRecords, isTravelRecordCompleted, travelRecordCounts } from "@/lib/travel-ledger";
+import { filterTravelRecords, isTravelRecordCompleted, paginateTravelRecords, travelRecordCounts } from "@/lib/travel-ledger";
 import { participantTravelTransportLabel, travelDestinationRegion, travelTransportLabel } from "@/lib/travel-document-format";
 import styles from "./travel.module.css";
 
@@ -503,6 +503,7 @@ export default function TravelWorkspace({ user, defaultOrigin, defaultReportAppr
   const [sourceMismatch, setSourceMismatch] = useState("");
   const [recentTrips, setRecentTrips] = useState([]);
   const [ledgerFilter, setLedgerFilter] = useState("all");
+  const [ledgerPage, setLedgerPage] = useState(1);
   const [farePresets, setFarePresets] = useState([]);
   const [fareOptions, setFareOptions] = useState([]);
   const [fareDirection, setFareDirection] = useState("outbound");
@@ -516,6 +517,7 @@ export default function TravelWorkspace({ user, defaultOrigin, defaultReportAppr
     ? `기본 출발지는 ${defaultOrigin}입니다. 승인 PDF 또는 원본 HWPX를 올려주세요.`
     : "승인 PDF 또는 원본 HWPX를 올려주세요. 두 파일을 함께 올리면 HWPX 표를 우선 적용합니다.");
   const [activeSection, setActiveSection] = useState("review");
+  const ledgerListRef = useRef(null);
   const pdfInputRef = useRef(null);
   const hwpxInputRef = useRef(null);
   const parseRequestRef = useRef(0);
@@ -527,6 +529,7 @@ export default function TravelWorkspace({ user, defaultOrigin, defaultReportAppr
   }, [trip, farePresets]);
   const ledgerCounts = useMemo(() => travelRecordCounts(recentTrips), [recentTrips]);
   const filteredTrips = useMemo(() => filterTravelRecords(recentTrips, ledgerFilter), [recentTrips, ledgerFilter]);
+  const ledger = useMemo(() => paginateTravelRecords(filteredTrips, ledgerPage), [filteredTrips, ledgerPage]);
   const hasSourceDocument = Boolean(approvedPdfFile || sourceHwpxFile);
 
   useEffect(() => {
@@ -615,6 +618,11 @@ export default function TravelWorkspace({ user, defaultOrigin, defaultReportAppr
     setNotice(value
       ? `${value} 지역을 출발 기준지로 적용했습니다. 관리자 운임을 다시 확인합니다.`
       : "실제 출장 출발 기준지를 선택해 주세요.");
+  }
+
+  function moveLedgerPage(page) {
+    setLedgerPage(page);
+    ledgerListRef.current?.scrollIntoView({ block: "start" });
   }
 
   function openExpenseSection() {
@@ -1047,6 +1055,7 @@ export default function TravelWorkspace({ user, defaultOrigin, defaultReportAppr
       setTrip((current) => current.id === tripForRecord.id ? { ...current, id: data.trip.id } : current);
     }
     setRecentTrips((current) => [data.trip, ...current.filter((item) => item.id !== data.trip.id)].slice(0, 200));
+    setLedgerPage(1);
     return data;
   }
 
@@ -1215,6 +1224,7 @@ export default function TravelWorkspace({ user, defaultOrigin, defaultReportAppr
           ? `출장 정산 완료 기록을 저장했습니다. ${data.sourceCleanupWarning}`
           : "출장 정산 완료 기록을 저장했습니다.");
       setRecentTrips((current) => [data.trip, ...current.filter((item) => item.id !== data.trip.id)].slice(0, 200));
+      setLedgerPage(1);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "저장하지 못했습니다.");
     } finally {
@@ -1650,12 +1660,12 @@ export default function TravelWorkspace({ user, defaultOrigin, defaultReportAppr
         <div className={styles.ledgerToolbar}>
           <div role="group" aria-label="출장대장 상태 필터">
             {[["all", "전체"], ["pending", "정산 필요"], ["completed", "정산 완료"]].map(([value, label]) => (
-              <button key={value} type="button" className={ledgerFilter === value ? styles.ledgerFilterActive : ""} onClick={() => setLedgerFilter(value)}>{label}</button>
+              <button key={value} type="button" className={ledgerFilter === value ? styles.ledgerFilterActive : ""} onClick={() => { setLedgerFilter(value); setLedgerPage(1); }}>{label}</button>
             ))}
           </div>
           <p>출장일 기준으로 전자결재 목록과 비교하세요. 대장에 없거나 ‘정산 필요’인 출장은 정산 누락 여부를 확인하면 됩니다.</p>
         </div>
-        <div className={styles.recentList}>{filteredTrips.length ? filteredTrips.map((item) => {
+        <div ref={ledgerListRef} className={styles.recentList}>{ledger.items.length ? ledger.items.map((item) => {
           const completed = isTravelRecordCompleted(item);
           return <article key={item.id}>
             <div><strong>{ledgerDate(item.start_at)} · {item.employee_name || "출장자 확인 필요"}</strong><span>{item.destination || "출장지 확인 필요"}{item.participant_count > 1 ? ` · ${item.participant_count}명 출장` : ""}</span></div>
@@ -1664,6 +1674,16 @@ export default function TravelWorkspace({ user, defaultOrigin, defaultReportAppr
             <button className={styles.deleteTripButton} type="button" onClick={() => deleteTrip(item)} disabled={Boolean(busy)} aria-label={`${String(item.start_at || "").slice(0, 10)} ${item.destination || "출장지 미입력"} 출장 삭제`}>{busy === `delete-${item.id}` ? "삭제 중…" : "삭제"}</button>
           </article>;
         }) : <div className={styles.emptyRecent}>{recentTrips.length ? "선택한 상태의 출장 기록이 없습니다." : "승인 PDF 또는 HWPX를 올리면 출장대장에 자동 등록됩니다."}</div>}</div>
+        {ledger.pageCount > 1 ? <nav className={styles.ledgerPager} aria-label="출장대장 페이지">
+          <span>{ledger.from}–{ledger.to} / {ledger.total}건</span>
+          <div>
+            <button type="button" onClick={() => moveLedgerPage(ledger.page - 1)} disabled={ledger.page === 1}>이전</button>
+            {Array.from({ length: ledger.pageCount }, (_, index) => index + 1).map((page) => (
+              <button key={page} type="button" className={page === ledger.page ? styles.ledgerPageActive : ""} aria-current={page === ledger.page ? "page" : undefined} onClick={() => moveLedgerPage(page)}>{page}</button>
+            ))}
+            <button type="button" onClick={() => moveLedgerPage(ledger.page + 1)} disabled={ledger.page === ledger.pageCount}>다음</button>
+          </div>
+        </nav> : null}
       </section>
 
       <section id="policy" className={styles.policySection}>

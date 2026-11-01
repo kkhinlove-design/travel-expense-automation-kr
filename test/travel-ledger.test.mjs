@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   filterTravelRecords,
   isTravelRecordCompleted,
+  paginateTravelRecords,
   safeTravelTimestamp,
   travelRecordCounts,
 } from "../lib/travel-ledger.js";
@@ -42,4 +43,17 @@ test("출장 API와 화면은 파일 저장 없이 승인 기록·정산 완료�
   assert.match(workspace, /내 출장대장 · 누락 점검/);
   assert.match(workspace, /정산 완료/);
   assert.doesNotMatch(workspace, /formData\.set\("approvedPdf"|formData\.set\("sourceHwpx"/);
+});
+
+test("출장대장은 10건씩 나누고 범위를 벗어난 페이지는 마지막 페이지로 맞춘다", () => {
+  const list = Array.from({ length: 23 }, (_, index) => ({ id: index + 1 }));
+  const first = paginateTravelRecords(list, 1);
+  assert.deepEqual([first.items.length, first.pageCount, first.from, first.to, first.total], [10, 3, 1, 10, 23]);
+  const last = paginateTravelRecords(list, 3);
+  assert.deepEqual(last.items.map((item) => item.id), [21, 22, 23]);
+  assert.deepEqual([last.from, last.to], [21, 23]);
+  assert.equal(paginateTravelRecords(list.slice(0, 20), 3).page, 2);
+  assert.equal(paginateTravelRecords(list, 0).page, 1);
+  assert.equal(paginateTravelRecords(list.slice(0, 10), 1).pageCount, 1);
+  assert.deepEqual([paginateTravelRecords([], 1).pageCount, paginateTravelRecords([], 1).from, paginateTravelRecords([], 1).to], [1, 0, 0]);
 });

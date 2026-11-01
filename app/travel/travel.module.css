@@ -296,7 +296,13 @@
 .ledgerToolbar button { min-height: 38px; padding: 0 13px; border: 1px solid var(--line); border-radius: 999px; background: #fff; color: #5d6879; font-size: 12px; font-weight: 900; }
 .ledgerToolbar .ledgerFilterActive { border-color: #2c5fc8; background: #2c5fc8; color: #fff; }
 .ledgerToolbar p { margin: 0; color: #6c7584; font-size: 12px; line-height: 1.55; text-align: right; }
-.recentList { display: grid; gap: 8px; margin-top: 21px; }
+.recentList { display: grid; gap: 8px; margin-top: 21px; scroll-margin-top: 16px; }
+.ledgerPager { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; justify-content: space-between; margin-top: 16px; }
+.ledgerPager > span { color: var(--muted); font-size: 12px; font-weight: 800; }
+.ledgerPager > div { display: flex; flex-wrap: wrap; gap: 6px; }
+.ledgerPager button { min-width: 38px; min-height: 38px; padding: 0 11px; border: 1px solid var(--line); border-radius: 9px; background: #fff; color: #5d6879; font-size: 12px; font-weight: 800; }
+.ledgerPager button:disabled { opacity: .45; cursor: not-allowed; }
+.ledgerPager .ledgerPageActive { border-color: #2c5fc8; background: #2c5fc8; color: #fff; }
 .recentList article { display: grid; grid-template-columns: minmax(0, 1fr) 88px 72px 64px; gap: 10px; align-items: center; min-height: 70px; padding: 12px 18px; border: 1px solid var(--line); border-radius: 13px; background: rgba(255,255,255,.84); }
 .recentList article strong, .recentList article span { display: block; }
 .recentList article strong { font-size: 14px; }
