@@ -1,5 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
-  "buildCommand": "npm run build"
+  "buildCommand": "npm run build",
+  "ignoreCommand": "case \"$VERCEL_GIT_COMMIT_REF\" in wip/*) echo skip-wip-backup; exit 0;; *) exit 1;; esac"
 }
