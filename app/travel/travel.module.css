@@ -180,6 +180,8 @@
 .fareOptionGrid article > div:last-child { min-width: 150px; text-align: right; }
 .fareOptionGrid article b { margin: 3px 0 7px; font-size: 14px; }
 .fareOptionGrid article button { min-height: 36px; padding: 0 10px; border-radius: 7px; background: #e7edf8; color: #315895; font-size: 12px; font-weight: 900; }
+.fareRouteWarning { margin: 14px 0 0; padding: 12px 14px; border: 1px solid #e5c983; border-radius: 10px; background: #fff8e8; color: #6f541c; font-size: 13px; line-height: 1.6; }
+.fareRouteWarning strong { margin-right: 6px; }
 .fareSourceNote { display: block; margin-top: 11px; color: #7f8794; font-size: 11px; line-height: 1.55; }
 .farePresetForm { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 17px 18px; padding: 19px; border: 1px solid #d9e0eb; border-radius: 13px; background: #f8fafc; }
 .fareImportBox { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 14px; padding: 16px 18px; border: 1px solid #bfd0ef; border-radius: 13px; background: #f2f6ff; }

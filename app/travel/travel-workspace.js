@@ -5,7 +5,7 @@ import { LOCAL_AI_CONFIG } from "@/config/local-ai";
 import { APP_FOOTER, ORGANIZATION_CONFIG } from "@/config/organization";
 import { TRAVEL_POLICY } from "@/config/travel-policy";
 import { buildTravelWorkbook, travelWorkbookFilename } from "@/lib/travel-excel";
-import { findAutomaticFareMatch } from "@/lib/travel-fare-matching";
+import { findAutomaticFareMatch, findFareRouteWarning } from "@/lib/travel-fare-matching";
 import { isManualFareSource, clearPresetFareForDateChange } from "@/lib/fare-dates";
 import { extractApprovedTravelHwpx, extractApprovedTravelPdf } from "@/lib/travel-parser";
 import {
@@ -520,6 +520,11 @@ export default function TravelWorkspace({ user, defaultOrigin, defaultReportAppr
   const hwpxInputRef = useRef(null);
   const parseRequestRef = useRef(0);
   const expense = useMemo(() => calculateTripExpense(trip), [trip]);
+  // 자동 적용된 기준표 운임이 남아 있는 동안만 경고한다. 양방향을 직접 입력하면 사라진다.
+  const fareRouteWarning = useMemo(() => {
+    const sources = [trip.fareSources?.outbound, trip.fareSources?.return].filter(Boolean);
+    return sources.some((source) => source.sourceType === "preset") ? findFareRouteWarning(trip, farePresets) : null;
+  }, [trip, farePresets]);
   const ledgerCounts = useMemo(() => travelRecordCounts(recentTrips), [recentTrips]);
   const filteredTrips = useMemo(() => filterTravelRecords(recentTrips, ledgerFilter), [recentTrips, ledgerFilter]);
   const hasSourceDocument = Boolean(approvedPdfFile || sourceHwpxFile);
@@ -1547,6 +1552,7 @@ export default function TravelWorkspace({ user, defaultOrigin, defaultReportAppr
                   <div className={styles.checkRow}><label><input type="checkbox" checked={trip.workshopStay} onChange={(event) => update("workshopStay", event.target.checked)} /><span>동일 장소에 3일 이상 체류</span></label></div>
                 </Field>
               </div>
+              {fareRouteWarning ? <p role="alert" className={styles.fareRouteWarning}><strong>운임 확인 필요</strong> 입력한 ‘{fareRouteWarning.inputWord}’을 기준표의 ‘{fareRouteWarning.presetLocation}’ 노선으로 찾아 자동 적용했습니다. 실제 목적지가 다르면 가는 길·오는 길 운임을 직접 입력해 주세요.</p> : null}
               <section className={styles.participantExpenseSection} aria-label="출장자별 여비 입력">
                 <div className={styles.participantExpenseHeading}><strong>출장자별 정산</strong><span>숙박·감액·제공 식사는 사람별로 입력합니다.</span></div>
                 <div className={styles.participantExpenseList}>
